@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cookbook — THE KITCHEN</title>
+<meta name="description" content="Recipes from my kitchen." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="nav shell" aria-label="Primary">
+    <a class="nav-brand" href="index.html" data-site-title>THE KITCHEN</a>
+    <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false"><span></span></button>
+    <ul class="nav-links">
+      <li><a href="cookbook.html" aria-current="page">COOKBOOK</a></li>
+      <li><a href="inventory.html">INVENTORY</a></li>
+      <li><a href="admin.html">ADMIN</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main>
+  <div class="shell">
+    <div class="page-header">
+      <div class="page-header__eyebrow">Recipe archive</div>
+      <h1>COOKBOOK</h1>
+      <p class="page-header__subtitle" id="cookbook-subtitle">Recipes from my kitchen.</p>
+    </div>
+
+    <div class="toolbar">
+      <div class="search-field">
+        <label for="recipe-search" class="visually-hidden">Search recipes</label>
+        <input type="search" id="recipe-search" placeholder="Search recipes..." autocomplete="off" />
+      </div>
+      <div class="filter-row" id="filter-row" role="group" aria-label="Filter recipes by category"></div>
+    </div>
+    <div class="toolbar toolbar--secondary">
+      <div class="toolbar__label">TYPE</div>
+      <div class="filter-row" id="type-filter-row" role="group" aria-label="Filter recipes by type"></div>
+    </div>
+
+    <div id="recipe-results" aria-live="polite">
+      <div class="loading-row">Loading recipes from back4app…</div>
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="shell">A personal kitchen archive.</div>
+</footer>
+
+<!-- Recipe detail modal -->
+<div class="modal-overlay" id="recipe-modal-overlay" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="recipe-modal-title">
+    <button class="modal__close" id="recipe-modal-close" aria-label="Close recipe" data-autofocus>&times;</button>
+    <div id="recipe-modal-content"></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/parse/dist/parse.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/parse.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/cookbook.js"></script>
+</body>
+</html>

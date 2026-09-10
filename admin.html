@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Admin — THE KITCHEN</title>
+<meta name="robots" content="noindex" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="nav shell" aria-label="Primary">
+    <a class="nav-brand" href="index.html" data-site-title>THE KITCHEN</a>
+    <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false"><span></span></button>
+    <ul class="nav-links">
+      <li><a href="cookbook.html">COOKBOOK</a></li>
+      <li><a href="inventory.html">INVENTORY</a></li>
+      <li><a href="admin.html" aria-current="page">ADMIN</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main>
+
+  <!-- Login screen -->
+  <section class="admin-login" id="admin-login-screen">
+    <h1>ADMIN</h1>
+    <form id="admin-login-form" novalidate>
+      <div class="field" style="margin-bottom:1rem;">
+        <label for="admin-username">Username</label>
+        <input type="text" id="admin-username" name="username" autocomplete="username" required />
+      </div>
+      <div class="field" style="margin-bottom:1rem;">
+        <label for="admin-password">Password</label>
+        <input type="password" id="admin-password" name="password" autocomplete="current-password" required />
+      </div>
+      <p class="admin-error" id="admin-login-error" role="alert">Invalid username or password.</p>
+      <button type="submit" class="btn btn--primary" style="width:100%;">SIGN IN</button>
+    </form>
+  </section>
+
+  <!-- Dashboard (hidden until authenticated) -->
+  <section class="shell" id="admin-dashboard" hidden>
+    <div class="admin-bar">
+      <div>
+        <div class="page-header__eyebrow">Signed in as <span id="admin-username-display"></span></div>
+        <h1 style="font-size:var(--step-xl);">ADMIN</h1>
+      </div>
+      <button class="btn btn--ghost" id="admin-logout-btn">LOG OUT</button>
+    </div>
+
+    <div class="security-note">
+      This session token authenticates you as an admin. Full server-side authorization for every
+      database write should live in Cloud Code — see the README for details.
+    </div>
+
+    <div class="admin-tabs" role="tablist" aria-label="Admin sections" style="margin-top:1.5rem;">
+      <button class="admin-tab" role="tab" id="tab-inventory" aria-selected="true" aria-controls="panel-inventory">INVENTORY</button>
+      <button class="admin-tab" role="tab" id="tab-recipes" aria-selected="false" aria-controls="panel-recipes">RECIPES</button>
+    </div>
+
+    <!-- Inventory panel -->
+    <div id="panel-inventory" role="tabpanel" aria-labelledby="tab-inventory">
+      <div class="admin-missing-section" id="admin-missing-section">
+        <div class="admin-missing-section__title">NEEDED FOR RECIPES</div>
+        <div id="missing-ingredients-list">
+          <div class="loading-row">Loading…</div>
+        </div>
+      </div>
+
+      <div class="admin-table-toolbar">
+        <div class="search-field" style="flex:0 1 320px;">
+          <label for="admin-inventory-search" class="visually-hidden">Search inventory</label>
+          <input type="search" id="admin-inventory-search" placeholder="Search inventory..." />
+        </div>
+        <button class="btn btn--primary" id="add-inventory-btn">+ ADD ITEM</button>
+      </div>
+      <div id="admin-inventory-list" class="admin-list" aria-live="polite">
+        <div class="loading-row">Loading…</div>
+      </div>
+    </div>
+
+    <!-- Recipes panel -->
+    <div id="panel-recipes" role="tabpanel" aria-labelledby="tab-recipes" hidden>
+      <div class="admin-missing-section" id="admin-similar-ingredients-section">
+        <div class="admin-missing-section__title">SIMILAR INGREDIENT NAMES</div>
+        <div id="similar-ingredients-list">
+          <div class="loading-row">Loading…</div>
+        </div>
+      </div>
+
+      <div class="admin-missing-section" id="admin-similar-tags-section">
+        <div class="admin-missing-section__title">SIMILAR TAGS</div>
+        <div id="similar-tags-list">
+          <div class="loading-row">Loading…</div>
+        </div>
+      </div>
+
+      <div class="admin-table-toolbar">
+        <div class="search-field" style="flex:0 1 320px;">
+          <label for="admin-recipe-search" class="visually-hidden">Search recipes</label>
+          <input type="search" id="admin-recipe-search" placeholder="Search recipes..." />
+        </div>
+        <button class="btn btn--primary" id="add-recipe-btn">+ ADD RECIPE</button>
+      </div>
+      <div id="admin-recipe-list" class="admin-list" aria-live="polite">
+        <div class="loading-row">Loading…</div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="shell">A personal kitchen archive.</div>
+</footer>
+
+<!-- Inventory item form modal -->
+<div class="modal-overlay" id="item-modal-overlay" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="item-modal-title">
+    <button class="modal__close" id="item-modal-close" aria-label="Close">&times;</button>
+    <h2 id="item-modal-title">Add item</h2>
+    <form id="item-form" novalidate>
+      <div class="form-grid">
+        <div class="field field--full">
+          <label for="item-name">Name</label>
+          <input type="text" id="item-name" name="name" data-autofocus required />
+        </div>
+        <div class="field">
+          <label for="item-category">Category</label>
+          <select id="item-category" name="category"></select>
+        </div>
+        <div class="field">
+          <label for="item-location">Location</label>
+          <select id="item-location" name="location"></select>
+        </div>
+        <div class="field">
+          <label for="item-shelf">Shelf</label>
+          <select id="item-shelf" name="shelf"></select>
+        </div>
+        <div class="field">
+          <label for="item-quantity">Quantity</label>
+          <input type="number" id="item-quantity" name="quantity" min="0" step="0.1" />
+        </div>
+        <div class="field">
+          <label for="item-unit">Unit</label>
+          <input type="text" id="item-unit" name="unit" placeholder="bottle, g, cup…" />
+        </div>
+        <div class="field">
+          <label for="item-expiration">Expiration date</label>
+          <input type="date" id="item-expiration" name="expirationDate" />
+        </div>
+        <div class="field field--full">
+          <label>Level</label>
+          <div class="level-selector" id="item-level-selector"></div>
+          <input type="hidden" id="item-level" name="level" value="Full" />
+        </div>
+        <div class="field field--full">
+          <label for="item-notes">Notes</label>
+          <textarea id="item-notes" name="notes" rows="3"></textarea>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn--primary">SAVE</button>
+        <button type="button" class="btn btn--ghost" id="item-cancel-btn">CANCEL</button>
+        <button type="button" class="btn btn--danger" id="item-delete-btn" hidden style="margin-left:auto;">DELETE</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Recipe form modal -->
+<div class="modal-overlay" id="recipe-form-modal-overlay" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="recipe-form-modal-title" style="max-width:760px;">
+    <button class="modal__close" id="recipe-form-modal-close" aria-label="Close">&times;</button>
+    <h2 id="recipe-form-modal-title">Add recipe</h2>
+    <form id="recipe-form" novalidate>
+      <div class="form-grid">
+        <div class="field field--full">
+          <label for="recipe-title">Title</label>
+          <input type="text" id="recipe-title" name="title" data-autofocus required />
+        </div>
+        <div class="field field--full">
+          <label for="recipe-description">Description</label>
+          <textarea id="recipe-description" name="description" rows="2"></textarea>
+        </div>
+        <div class="field">
+          <label for="recipe-category">Category</label>
+          <input type="text" id="recipe-category" name="category" placeholder="Japanese, Dessert…" />
+        </div>
+        <div class="field">
+          <label for="recipe-type">Recipe type</label>
+          <select id="recipe-type" name="recipeType"></select>
+        </div>
+        <div class="field">
+          <label for="recipe-difficulty">Difficulty (1–5, optional)</label>
+          <input type="number" id="recipe-difficulty" name="difficulty" min="1" max="5" step="1" placeholder="e.g. 3" />
+        </div>
+        <div class="field">
+          <label for="recipe-tags">Tags (comma separated)</label>
+          <input type="text" id="recipe-tags" name="tags" placeholder="quick, vegetarian" />
+        </div>
+        <div class="field field--full">
+          <label for="recipe-requires">Requires (comma-separated recipe titles)</label>
+          <input type="text" id="recipe-requires" name="requiresRecipes" placeholder="Homemade Udon Noodles, Homemade Awase Dashi" />
+        </div>
+        <div class="field">
+          <label for="recipe-servings">Servings</label>
+          <input type="number" id="recipe-servings" name="servings" min="1" />
+        </div>
+        <div class="field">
+          <label for="recipe-prep">Prep time (min)</label>
+          <input type="number" id="recipe-prep" name="prepTime" min="0" />
+        </div>
+        <div class="field">
+          <label for="recipe-cook">Cook time (min)</label>
+          <input type="number" id="recipe-cook" name="cookTime" min="0" />
+        </div>
+
+        <div class="field field--full">
+          <label>Ingredients</label>
+          <div id="ingredient-rows"></div>
+          <button type="button" class="btn btn--ghost btn--small" id="add-ingredient-row" style="align-self:flex-start;">+ ADD INGREDIENT</button>
+        </div>
+
+        <div class="field field--full">
+          <label for="recipe-instructions">Instructions</label>
+          <textarea id="recipe-instructions" name="instructions" rows="8"></textarea>
+        </div>
+        <div class="field field--full">
+          <label for="recipe-notes">Notes</label>
+          <textarea id="recipe-notes" name="notes" rows="3"></textarea>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn--primary">SAVE</button>
+        <button type="button" class="btn btn--ghost" id="recipe-cancel-btn">CANCEL</button>
+        <button type="button" class="btn btn--danger" id="recipe-delete-btn" hidden style="margin-left:auto;">DELETE</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Confirm delete modal -->
+<div class="modal-overlay" id="confirm-modal-overlay" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title" style="max-width:420px;">
+    <button class="modal__close" id="confirm-modal-close" aria-label="Close">&times;</button>
+    <h2 id="confirm-modal-title">Are you sure?</h2>
+    <p id="confirm-modal-body">This can't be undone.</p>
+    <div class="form-actions">
+      <button type="button" class="btn btn--danger" id="confirm-modal-confirm" data-autofocus>DELETE</button>
+      <button type="button" class="btn btn--ghost" id="confirm-modal-cancel">CANCEL</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/parse/dist/parse.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/parse.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>

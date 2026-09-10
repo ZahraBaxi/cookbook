@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Inventory — THE KITCHEN</title>
+<meta name="description" content="What's in the kitchen." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="nav shell" aria-label="Primary">
+    <a class="nav-brand" href="index.html" data-site-title>THE KITCHEN</a>
+    <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false"><span></span></button>
+    <ul class="nav-links">
+      <li><a href="cookbook.html">COOKBOOK</a></li>
+      <li><a href="inventory.html" aria-current="page">INVENTORY</a></li>
+      <li><a href="admin.html">ADMIN</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main>
+  <div class="shell">
+    <div class="page-header">
+      <div class="page-header__eyebrow">Pantry, fridge & freezer</div>
+      <h1>INVENTORY</h1>
+      <p class="page-header__subtitle">What's in the kitchen.</p>
+    </div>
+  </div>
+
+  <div class="shell" style="padding:0;">
+    <div class="summary-strip" id="summary-strip"></div>
+  </div>
+
+  <div class="shell">
+    <div class="toolbar">
+      <div class="search-field">
+        <label for="inventory-search" class="visually-hidden">Search inventory</label>
+        <input type="search" id="inventory-search" placeholder="Search inventory..." autocomplete="off" />
+      </div>
+      <div class="filter-row" id="location-filter-row" role="group" aria-label="Filter by location"></div>
+    </div>
+
+    <div id="inventory-results" aria-live="polite">
+      <div class="loading-row">Loading inventory from back4app…</div>
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="shell">the kitchen.</div>
+</footer>
+
+<script src="https://unpkg.com/parse/dist/parse.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/parse.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/inventory.js"></script>
+</body>
+</html>
