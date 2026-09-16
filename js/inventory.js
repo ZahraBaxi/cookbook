@@ -256,10 +256,81 @@ function renderInventory() {
   }
 }
 
+/* ---------------------------------------------------------------------
+ * Copy Inventory — builds a plain-text summary of everything currently
+ * in stock, grouped the same way the page displays it, for pasting into
+ * ChatGPT/Claude/anywhere else to ask "what can I make with this?"
+ * ------------------------------------------------------------------- */
+
+function describeItemForExport(item) {
+  const parts = [inventoryItemLabel(item)];
+  const qty = [item.get("quantity"), item.get("unit")].filter((v) => v !== undefined && v !== null && v !== "").join(" ");
+  if (qty) parts.push(`(${qty})`);
+  if (CONFIG.LOW_LEVELS.includes(item.get("level"))) parts.push("— running low");
+  if (item.get("notes")) parts.push(`[${item.get("notes")}]`);
+  return parts.join(" ");
+}
+
+function buildInventoryExportText() {
+  const lines = [`Current kitchen inventory (as of ${new Date().toLocaleDateString()}):`, ""];
+
+  CONFIG.INVENTORY_LOCATIONS.forEach((location) => {
+    const itemsHere = allItems.filter((i) => i.get("location") === location);
+    if (!itemsHere.length) return;
+
+    lines.push(location.toUpperCase());
+    const shelfOrder = shelfOrderFor(location);
+    const grouped = {};
+    const noShelf = [];
+    itemsHere.forEach((item) => {
+      const shelf = item.get("shelf");
+      if (shelf) {
+        (grouped[shelf] = grouped[shelf] || []).push(item);
+      } else {
+        noShelf.push(item);
+      }
+    });
+
+    const shelfNames = [...new Set([...shelfOrder, ...Object.keys(grouped)])].filter((s) => grouped[s] && grouped[s].length);
+    shelfNames.forEach((shelf) => {
+      lines.push(`  ${shelf}:`);
+      grouped[shelf].forEach((item) => lines.push(`    - ${describeItemForExport(item)}`));
+    });
+    if (noShelf.length) {
+      lines.push(`  (no shelf noted):`);
+      noShelf.forEach((item) => lines.push(`    - ${describeItemForExport(item)}`));
+    }
+    lines.push("");
+  });
+
+  const knownLocations = new Set(CONFIG.INVENTORY_LOCATIONS);
+  const other = allItems.filter((i) => !knownLocations.has(i.get("location")));
+  if (other.length) {
+    lines.push("OTHER");
+    other.forEach((item) => lines.push(`  - ${describeItemForExport(item)}`));
+  }
+
+  return lines.join("\n").trim();
+}
+
+async function handleCopyInventoryClick() {
+  const text = buildInventoryExportText();
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast("Copied — paste it into ChatGPT, Claude, or anywhere else.");
+  } catch (err) {
+    console.error(err);
+    // Clipboard API can be blocked in some contexts (non-HTTPS, older
+    // browsers, permissions) — fall back to a manual-copy prompt.
+    window.prompt("Couldn't auto-copy — copy this manually:", text);
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("inventory-search").addEventListener("input", (e) => {
     invSearchQuery = e.target.value.trim();
     renderInventory();
   });
+  document.getElementById("copy-inventory-btn").addEventListener("click", handleCopyInventoryClick);
   loadInventoryData();
 });
