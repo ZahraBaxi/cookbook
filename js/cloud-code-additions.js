@@ -19,17 +19,19 @@
  *      the brief asked for: the frontend can send whatever it wants,
  *      but only a token that matches a real, unexpired session saved
  *      during adminLogin will be accepted.
- *   3. CRUD Cloud Functions for InventoryItem and Recipe, all using the
- *      Master Key internally (so they work regardless of Class-Level
- *      Permissions) but gated by requireAdmin().
+ *   3. CRUD Cloud Functions for InventoryItem and Recipe, plus a
+ *      whole-record upsert (adminSaveStorageLayout) for StorageLayout —
+ *      the visual doll-house grid used in Admin → Layout. All of them
+ *      use the Master Key internally (so they work regardless of
+ *      Class-Level Permissions) but are gated by requireAdmin().
  *
  * ONE MORE STEP ON THE BACK4APP DASHBOARD:
- *   Set InventoryItem and Recipe's Class-Level Permissions to
- *   "Public Read" and NO public write/update/delete. That way even if
- *   someone got hold of your App ID/JS Key (which are meant to be
- *   public), they still can't write directly through the client SDK —
- *   every write has to go through these Cloud Functions, which check
- *   the admin session.
+ *   Set InventoryItem, Recipe, and StorageLayout's Class-Level
+ *   Permissions to "Public Read" and NO public write/update/delete.
+ *   That way even if someone got hold of your App ID/JS Key (which are
+ *   meant to be public), they still can't write directly through the
+ *   client SDK — every write has to go through these Cloud Functions,
+ *   which check the admin session.
  * -----------------------------------------------------------------------
  */
 
@@ -40,6 +42,7 @@ const SESSION_TTL_MS = 1000 * 60 * 60 * 12; // 12 hours
 const AdminSession = Parse.Object.extend("AdminSession");
 const InventoryItem = Parse.Object.extend("InventoryItem");
 const Recipe = Parse.Object.extend("Recipe");
+const StorageLayout = Parse.Object.extend("StorageLayout");
 
 Parse.Cloud.define("adminLogin", async (request) => {
   const { username, password } = request.params;
@@ -93,7 +96,7 @@ async function requireAdmin(adminToken) {
   return session;
 }
 
-const INVENTORY_FIELDS = ["name", "category", "location", "shelf", "quantity", "unit", "level", "notes"];
+const INVENTORY_FIELDS = ["name", "variant", "category", "location", "shelf", "quantity", "unit", "level", "notes"];
 
 function applyInventoryFields(item, params) {
   INVENTORY_FIELDS.forEach((field) => {
@@ -165,4 +168,32 @@ Parse.Cloud.define("adminDeleteRecipe", async (request) => {
   const recipe = await query.get(request.params.id, { useMasterKey: true });
   await recipe.destroy({ useMasterKey: true });
   return { success: true };
+});
+
+/**
+ * Visual "doll house" storage layout (Admin → Layout). One StorageLayout
+ * record per location (Fridge/Freezer/Pantry/Counter/Other), holding its
+ * grid size and the list of named zones drawn on it. The frontend always
+ * sends the *whole* layout for a location — this upserts it wholesale
+ * rather than diffing individual zones, which keeps the client-side grid
+ * editor simple (it just mutates a local object and re-saves it).
+ */
+Parse.Cloud.define("adminSaveStorageLayout", async (request) => {
+  await requireAdmin(request.params.adminToken);
+  const { location, rows, cols, zones } = request.params;
+  if (!location) {
+    throw new Parse.Error(Parse.Error.INVALID_QUERY, "location is required");
+  }
+  const query = new Parse.Query(StorageLayout);
+  query.equalTo("location", location);
+  let layout = await query.first({ useMasterKey: true });
+  if (!layout) {
+    layout = new StorageLayout();
+    layout.set("location", location);
+  }
+  layout.set("rows", rows || 1);
+  layout.set("cols", cols || 1);
+  layout.set("zones", Array.isArray(zones) ? zones : []);
+  await layout.save(null, { useMasterKey: true });
+  return layout.toJSON();
 });

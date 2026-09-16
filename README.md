@@ -20,6 +20,9 @@ Static HTML/CSS/vanilla JS, backed by Back4App (Parse).
 │   ├── cookbook.js              Cookbook page logic
 │   ├── inventory.js             Inventory page logic
 │   ├── admin.js                  Admin login + CRUD logic
+│   ├── storage-layout.js         Doll-house grid: shared by Admin → Layout,
+│   │                              the item form's location/shelf picker,
+│   │                              and the Inventory mini-map
 │   └── seed.js                   Optional: sample data, run once from the console
 ├── cloud-code-additions.js  Back4App Cloud Code to paste in (NOT part of the static site)
 └── README.md
@@ -67,11 +70,12 @@ check alone is not real security.
   writing to Parse directly, so the Master Key never leaves the server.
 
 **You still need to do one thing in the Back4App dashboard**: set
-`InventoryItem` and `Recipe`'s Class-Level Permissions to **Public Read**,
-with **no public write/update/delete**. That closes the last gap — right now,
-anyone with your App ID/JS Key could otherwise write to those classes
-directly through the client SDK, bypassing the site entirely. Cookbook and
-Inventory only ever read, so read access can safely stay public.
+`InventoryItem`, `Recipe`, and `StorageLayout`'s Class-Level Permissions to
+**Public Read**, with **no public write/update/delete**. That closes the
+last gap — right now, anyone with your App ID/JS Key could otherwise write
+to those classes directly through the client SDK, bypassing the site
+entirely. Cookbook and Inventory only ever read, so read access can safely
+stay public.
 
 Do not deploy this as "secure" without applying `cloud-code-additions.js`
 and locking down those permissions — as shipped, the original `adminLogin`
@@ -82,6 +86,7 @@ alone does not protect the database.
 **InventoryItem**
 ```
 name            String
+variant         String   (optional — e.g. "Roma", "Cherry" for a Tomato)
 category        String
 location        String
 shelf           String
@@ -121,6 +126,21 @@ ingredient matching) and recursively checks each required recipe's own
 readiness — so "Kake Udon" can correctly report "missing potato starch"
 even though potato starch never appears in Kake Udon's own ingredient
 list, only in Homemade Udon Noodles'.
+
+**StorageLayout** (one record per location, created automatically the
+first time you save a zone in Admin → Layout)
+```
+location    String   ("Fridge", "Freezer", "Pantry", "Counter", "Other")
+rows        Number
+cols        Number
+zones       Array    (see structure below)
+```
+
+`zones` is an array of objects, each a rectangle of grid cells:
+```json
+[{ "id": "zone-...", "name": "Top Shelf", "type": "Shelf",
+   "rowStart": 0, "rowEnd": 0, "colStart": 0, "colEnd": 3 }]
+```
 
 **AdminSession** (created automatically the first time `adminLogin` runs,
 once `cloud-code-additions.js` is deployed)
@@ -164,6 +184,35 @@ add recipes that require it. The Indian batch follows the same pattern —
 Homemade Paneer's detail view will show "Used By: Palak Paneer, Matar
 Paneer, Paneer Tikka, Shahi Paneer" once all four are added.
 
+## Visual storage layout ("Admin → Layout")
+
+Instead of a hardcoded text list of shelves, each location's storage is a
+grid you lay out yourself. In Admin → Layout, click a location (Fridge,
+Freezer, Pantry, Counter, Other) to open its grid, then click-drag across
+empty cells to mark a new zone — a shelf, drawer, door bin, or basket —
+and name it. Click an existing zone to rename, retype, or delete it.
+"Rows"/"Cols" resizes the grid; shrinking it drops any zones that no
+longer fit (you'll get a toast saying how many).
+
+This replaces the old Location/Shelf dropdowns everywhere:
+
+- **Item form (Admin → Inventory → Add/Edit item)**: "Where is it?" opens
+  the same doll-house — pick a location, then tap a zone (or "use this
+  location, no specific shelf" if you haven't carved it up yet).
+- **Inventory page**: a read-only mini-map sits above the item list for
+  any location with zones configured, showing each zone's item count.
+  Tapping a zone filters the list to just that shelf/drawer/bin.
+
+Layouts are per-location StorageLayout records (see the class definition
+above) and are shared across everyone viewing the public site — since
+Inventory reads them without logging in, they're plain "Public Read"
+data like InventoryItem and Recipe, not admin-only. Only Admin → Layout
+can write them, via `adminSaveStorageLayout`.
+
+A location with no zones yet just doesn't show a mini-map on Inventory
+and offers only "no specific shelf" in the item-form picker — nothing
+breaks, it just isn't subdivided until you draw something.
+
 ## How recipe-to-inventory matching works
 
 `js/utils.js` → `ingredientMatchesInventoryItem()`. It strips filler words
@@ -172,6 +221,41 @@ name and the inventory item name, and checks whether most of the ingredient's
 words appear in the inventory name (matching substrings too, so "shiitake"
 matches inside "Dynasty Dried Shiitake"). No external API, nothing exotic —
 just enough normalization to handle real pantry names.
+
+A few other things happen before that comparison:
+
+- **"X or Y" alternatives** ("milk or coconut milk") are split into
+  separate options first — having any ONE in stock counts as available,
+  rather than scoring the whole phrase as one bag of words (which used to
+  silently demand most of both alternatives at once on longer lists).
+- **Purpose clauses** ("oil, FOR FRYING") are stripped before matching, so
+  the extra words don't count against the match the way the actual
+  ingredient word does.
+- **A synonym/abbreviation dictionary** (`INGREDIENT_ALIASES` near the top
+  of `js/utils.js`) rewrites known aliases to one canonical form before
+  anything else happens — "AP flour"/"plain flour"/"all purpose flour",
+  British ↔ American pairs (aubergine/eggplant, courgette/zucchini,
+  coriander/cilantro, mince/ground beef, stock/broth, and more), spelling
+  variants (yoghurt/yogurt, chilli/chili), and so on. It's intentionally
+  conservative — it only merges things that really are the same product,
+  never close-but-different ones (salted vs. unsalted butter stay
+  separate) — and it's a plain array, so adding another pair you hit is a
+  one-line edit.
+
+This same normalization also powers the two duplicate-detection tools
+under Admin → Inventory ("Needed for Recipes" and "Similar Inventory
+Items"), since they all route through the same `normalizeText()`.
+
+### The optional Type field
+
+Inventory items have an optional **Type** field, separate from Name —
+e.g. `name: "Tomato"`, `variant: "Roma"`. This exists so a generic recipe
+ingredient ("tomato") still matches ANY typed tomato in stock, while
+"Similar Inventory Items" doesn't nag you to merge "Tomato / Roma" and
+"Tomato / Cherry" into one — those are deliberately different, not a
+typo. It only flags a "different type?" pair when one entry has no Type
+set at all (ambiguous — might really be the same thing as a typed one),
+and never flags two entries that both have an explicit, different Type.
 
 ## Deploying to GitHub Pages
 

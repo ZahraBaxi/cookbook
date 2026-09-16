@@ -61,6 +61,7 @@
     <div class="admin-tabs" role="tablist" aria-label="Admin sections" style="margin-top:1.5rem;">
       <button class="admin-tab" role="tab" id="tab-inventory" aria-selected="true" aria-controls="panel-inventory">INVENTORY</button>
       <button class="admin-tab" role="tab" id="tab-recipes" aria-selected="false" aria-controls="panel-recipes">RECIPES</button>
+      <button class="admin-tab" role="tab" id="tab-layout" aria-selected="false" aria-controls="panel-layout">LAYOUT</button>
     </div>
 
     <!-- Inventory panel -->
@@ -68,6 +69,13 @@
       <div class="admin-missing-section" id="admin-missing-section">
         <div class="admin-missing-section__title">NEEDED FOR RECIPES</div>
         <div id="missing-ingredients-list">
+          <div class="loading-row">Loading…</div>
+        </div>
+      </div>
+
+      <div class="admin-missing-section" id="admin-similar-inventory-section">
+        <div class="admin-missing-section__title">SIMILAR INVENTORY ITEMS</div>
+        <div id="similar-inventory-list">
           <div class="loading-row">Loading…</div>
         </div>
       </div>
@@ -111,6 +119,17 @@
         <div class="loading-row">Loading…</div>
       </div>
     </div>
+
+    <!-- Layout panel -->
+    <div id="panel-layout" role="tabpanel" aria-labelledby="tab-layout" hidden>
+      <p class="admin-missing-empty" style="padding:1rem 0;">
+        Every location, all at once — like a straight-on cutaway of the kitchen. Drag across empty
+        cells in any grid to name a new zone (shelf, drawer, bin); click an existing zone to
+        rename, retype, or delete it. This is what powers the location/shelf picker in the item
+        form and the mini-map on Inventory.
+      </p>
+      <div id="layout-all"></div>
+    </div>
   </section>
 </main>
 
@@ -130,16 +149,21 @@
           <input type="text" id="item-name" name="name" data-autofocus required />
         </div>
         <div class="field">
+          <label for="item-variant">Type <span style="color:var(--color-text-secondary); font-weight:400;">(optional)</span></label>
+          <input type="text" id="item-variant" name="variant" placeholder="e.g. Roma, Cherry, Heirloom" />
+        </div>
+        <div class="field">
           <label for="item-category">Category</label>
           <select id="item-category" name="category"></select>
         </div>
-        <div class="field">
-          <label for="item-location">Location</label>
-          <select id="item-location" name="location"></select>
-        </div>
-        <div class="field">
-          <label for="item-shelf">Shelf</label>
-          <select id="item-shelf" name="shelf"></select>
+        <div class="field field--full">
+          <label>Where is it?</label>
+          <button type="button" class="location-picker-btn" id="item-location-picker-btn">
+            <span id="item-location-picker-label">Not set</span>
+            <span class="location-picker-btn__arrow">↳</span>
+          </button>
+          <input type="hidden" id="item-location" name="location" required />
+          <input type="hidden" id="item-shelf" name="shelf" />
         </div>
         <div class="field">
           <label for="item-quantity">Quantity</label>
@@ -244,6 +268,45 @@
   </div>
 </div>
 
+<!-- Location/shelf picker modal (used by the item form) -->
+<div class="modal-overlay" id="location-picker-modal-overlay" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="location-picker-modal-title">
+    <button class="modal__close" id="location-picker-modal-close" aria-label="Close">&times;</button>
+    <h2 id="location-picker-modal-title">Pick a spot</h2>
+    <div id="location-picker-breadcrumb"></div>
+    <div id="location-picker-dollhouse"></div>
+    <div id="location-picker-grid-wrap" hidden>
+      <div id="location-picker-grid"></div>
+      <button type="button" class="btn btn--ghost btn--small" id="location-picker-no-shelf-btn" style="margin-top:1rem;">USE THIS LOCATION, NO SPECIFIC SHELF</button>
+    </div>
+  </div>
+</div>
+
+<!-- Zone edit modal (used by the Layout tab's grid editor) -->
+<div class="modal-overlay" id="zone-modal-overlay" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="zone-modal-title" style="max-width:420px;">
+    <button class="modal__close" id="zone-modal-close" aria-label="Close">&times;</button>
+    <h2 id="zone-modal-title">New zone</h2>
+    <form id="zone-form" novalidate>
+      <div class="form-grid form-grid--single">
+        <div class="field">
+          <label for="zone-name">Name</label>
+          <input type="text" id="zone-name" name="name" data-autofocus required placeholder="Top Shelf, Crisper, Door Bin 2…" />
+        </div>
+        <div class="field">
+          <label for="zone-type">Type</label>
+          <select id="zone-type" name="type"></select>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn--primary">SAVE</button>
+        <button type="button" class="btn btn--ghost" id="zone-cancel-btn">CANCEL</button>
+        <button type="button" class="btn btn--danger" id="zone-delete-btn" hidden style="margin-left:auto;">DELETE</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- Confirm delete modal -->
 <div class="modal-overlay" id="confirm-modal-overlay" aria-hidden="true">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title" style="max-width:420px;">
@@ -261,6 +324,7 @@
 <script src="js/config.js"></script>
 <script src="js/parse.js"></script>
 <script src="js/utils.js"></script>
+<script src="js/storage-layout.js"></script>
 <script src="js/admin.js"></script>
 </body>
 </html>

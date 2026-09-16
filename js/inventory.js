@@ -10,23 +10,94 @@
 let allItems = [];
 let activeLocation = "All";
 let invSearchQuery = "";
+let activeShelfFilter = null; // { location, shelf } | null — set by tapping the mini-map
+let storageLayouts = {}; // location -> { rows, cols, zones } — see storage-layout.js
 
 const InventoryItemClass = Parse.Object.extend("InventoryItem");
 
+// Fallback shelf order for items whose location has no configured Layout
+// yet (e.g. imported/legacy data) — once a Layout exists, shelf order
+// instead follows the zones' actual top-to-bottom, left-to-right order.
 const FRIDGE_SHELF_ORDER = ["Top", "Middle", "Bottom", "Crisper", "Door", "Other"];
 const PANTRY_SHELF_ORDER = ["Shelf 1", "Shelf 2", "Shelf 3", "Shelf 4", "Other"];
+
+function shelfOrderFor(location) {
+  const layout = storageLayouts[location];
+  if (layout && layout.zones && layout.zones.length) {
+    return sortedZones(layout).map((z) => z.name);
+  }
+  if (location === "Pantry") return PANTRY_SHELF_ORDER;
+  return FRIDGE_SHELF_ORDER;
+}
 
 async function loadInventoryData() {
   const resultsEl = document.getElementById("inventory-results");
   try {
-    allItems = await new Parse.Query(InventoryItemClass).ascending("name").limit(2000).find();
+    [allItems, storageLayouts] = await Promise.all([
+      new Parse.Query(InventoryItemClass).ascending("name").limit(2000).find(),
+      loadStorageLayouts(),
+    ]);
     renderSummary();
+    renderMiniMap();
     renderLocationFilters();
     renderInventory();
   } catch (err) {
     console.error(err);
     resultsEl.innerHTML = `<div class="empty-state"><p class="empty-state__title">Couldn't load the inventory.</p><p>${escapeHtml(err.message || "Check your connection and try again.")}</p></div>`;
   }
+}
+
+/* ---------------------------------------------------------------------
+ * Mini-map — read-only doll house grids per location, with an item
+ * count per zone. Tapping a zone filters the list below to just that
+ * shelf/drawer/bin; tapping it again (or Clear) clears the filter.
+ * ------------------------------------------------------------------- */
+
+function itemCountsByZone(location) {
+  const counts = {};
+  allItems
+    .filter((i) => i.get("location") === location)
+    .forEach((i) => {
+      const shelf = i.get("shelf") || "Other";
+      counts[shelf] = (counts[shelf] || 0) + 1;
+    });
+  return counts;
+}
+
+function renderMiniMap() {
+  const container = document.getElementById("mini-map-locations");
+  if (!container) return;
+  container.innerHTML = "";
+
+  CONFIG.INVENTORY_LOCATIONS.forEach((location) => {
+    const layout = storageLayouts[location];
+    if (!layout || !layout.zones || !layout.zones.length) return; // nothing configured yet — skip
+
+    const wrap = document.createElement("div");
+    wrap.className = "mini-map-location";
+    wrap.innerHTML = `<div class="mini-map-location__title">${escapeHtml(location)}</div>`;
+    const gridEl = document.createElement("div");
+    wrap.appendChild(gridEl);
+    container.appendChild(wrap);
+
+    renderStorageGrid(gridEl, {
+      layout,
+      mode: "view",
+      itemCounts: itemCountsByZone(location),
+      highlightZoneId: activeShelfFilter && activeShelfFilter.location === location
+        ? (layout.zones.find((z) => z.name === activeShelfFilter.shelf) || {}).id
+        : null,
+      onZoneClick: (zone) => {
+        if (activeShelfFilter && activeShelfFilter.location === location && activeShelfFilter.shelf === zone.name) {
+          activeShelfFilter = null;
+        } else {
+          activeShelfFilter = { location, shelf: zone.name };
+        }
+        renderMiniMap();
+        renderInventory();
+      },
+    });
+  });
 }
 
 function renderSummary() {
@@ -80,11 +151,16 @@ function renderLocationFilters() {
 function itemMatchesSearch(item) {
   if (!invSearchQuery) return true;
   const q = invSearchQuery.toLowerCase();
-  const haystack = [item.get("name"), item.get("category"), item.get("notes"), item.get("shelf")]
+  const haystack = [item.get("name"), item.get("variant"), item.get("category"), item.get("notes"), item.get("shelf")]
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
   return haystack.includes(q);
+}
+
+function itemMatchesShelfFilter(item) {
+  if (!activeShelfFilter) return true;
+  return item.get("location") === activeShelfFilter.location && (item.get("shelf") || "") === activeShelfFilter.shelf;
 }
 
 function renderItemCard(item) {
@@ -94,7 +170,7 @@ function renderItemCard(item) {
 
   return `
     <div class="item-card ${low ? "item-card--low" : ""}">
-      <div class="item-card__name">${escapeHtml(item.get("name"))}</div>
+      <div class="item-card__name">${escapeHtml(inventoryItemLabel(item))}</div>
       <div class="item-card__category">${escapeHtml(item.get("category") || "")}</div>
       <div class="item-card__meta">
         <span>${escapeHtml(qtyParts.join(" "))}</span>
@@ -143,29 +219,41 @@ function renderInventory() {
     return;
   }
 
-  const filtered = allItems.filter(itemMatchesSearch);
+  const filtered = allItems.filter(itemMatchesSearch).filter(itemMatchesShelfFilter);
   const byLocation = (loc) => filtered.filter((i) => i.get("location") === loc);
 
-  let html = "";
+  const filterBanner = activeShelfFilter
+    ? `<div class="toolbar--secondary"><span class="toolbar__label">Showing: ${escapeHtml(activeShelfFilter.location)} · ${escapeHtml(activeShelfFilter.shelf)}</span> <button type="button" class="btn btn--ghost btn--small" id="clear-shelf-filter-btn">CLEAR</button></div>`
+    : "";
+
+  let sectionsHtml = "";
 
   if (activeLocation === "All") {
-    if (byLocation("Fridge").length) html += renderGroupedByShelf(byLocation("Fridge"), FRIDGE_SHELF_ORDER, "FRIDGE");
-    if (byLocation("Freezer").length) html += renderGroupedByShelf(byLocation("Freezer"), FRIDGE_SHELF_ORDER, "FREEZER");
-    if (byLocation("Pantry").length) html += renderGroupedByShelf(byLocation("Pantry"), PANTRY_SHELF_ORDER, "PANTRY");
+    if (byLocation("Fridge").length) sectionsHtml += renderGroupedByShelf(byLocation("Fridge"), shelfOrderFor("Fridge"), "FRIDGE");
+    if (byLocation("Freezer").length) sectionsHtml += renderGroupedByShelf(byLocation("Freezer"), shelfOrderFor("Freezer"), "FREEZER");
+    if (byLocation("Pantry").length) sectionsHtml += renderGroupedByShelf(byLocation("Pantry"), shelfOrderFor("Pantry"), "PANTRY");
     const other = filtered.filter((i) => !["Fridge", "Freezer", "Pantry"].includes(i.get("location")));
-    if (other.length) html += renderFlatSection(other, "OTHER");
+    if (other.length) sectionsHtml += renderFlatSection(other, "OTHER");
   } else if (activeLocation === "Fridge" || activeLocation === "Freezer") {
-    html = filtered.length ? renderGroupedByShelf(filtered, FRIDGE_SHELF_ORDER, activeLocation.toUpperCase()) : "";
+    sectionsHtml = filtered.length ? renderGroupedByShelf(filtered, shelfOrderFor(activeLocation), activeLocation.toUpperCase()) : "";
   } else if (activeLocation === "Pantry") {
-    html = filtered.length ? renderGroupedByShelf(filtered, PANTRY_SHELF_ORDER, "PANTRY") : "";
+    sectionsHtml = filtered.length ? renderGroupedByShelf(filtered, shelfOrderFor("Pantry"), "PANTRY") : "";
   }
 
-  if (!html) {
-    resultsEl.innerHTML = `<div class="empty-state"><p class="empty-state__title">Nothing found.</p><p>Try a different search or view.</p></div>`;
-    return;
+  if (!sectionsHtml) {
+    resultsEl.innerHTML = filterBanner + `<div class="empty-state"><p class="empty-state__title">Nothing found.</p><p>Try a different search or view.</p></div>`;
+  } else {
+    resultsEl.innerHTML = filterBanner + sectionsHtml;
   }
 
-  resultsEl.innerHTML = html;
+  const clearBtn = document.getElementById("clear-shelf-filter-btn");
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      activeShelfFilter = null;
+      renderMiniMap();
+      renderInventory();
+    });
+  }
 }
 
 document.addEventListener("DOMContentLoaded", () => {

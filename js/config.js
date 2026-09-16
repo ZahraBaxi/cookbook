@@ -31,13 +31,23 @@ const CONFIG = {
     "Sauces", "Spices", "Tea", "Frozen", "Snacks", "Baking", "Other",
   ],
   INVENTORY_LOCATIONS: ["Fridge", "Freezer", "Pantry", "Counter", "Other"],
-  SHELF_OPTIONS: {
-    Pantry: ["Shelf 1", "Shelf 2", "Shelf 3", "Shelf 4", "Other"],
-    Fridge: ["Top", "Middle", "Bottom", "Door", "Crisper", "Other"],
-    Freezer: ["Top", "Bottom", "Door", "Other"],
-    Counter: ["Other"],
-    Other: ["Other"],
+
+  // Visual layout ("doll house") defaults. Each location gets a grid of
+  // cells that admin can carve into named zones (shelves, drawers, bins)
+  // in Admin → Layout. These row/col counts are only the STARTING size
+  // for a location the first time its layout is opened — admin can
+  // resize from there, and the chosen size + zones are saved to the
+  // StorageLayout class so they persist and don't reset on reload.
+  STORAGE_GRID_DEFAULTS: {
+    Fridge: { rows: 6, cols: 4 },
+    Freezer: { rows: 4, cols: 3 },
+    Pantry: { rows: 6, cols: 4 },
+    Counter: { rows: 2, cols: 5 },
+    Other: { rows: 3, cols: 3 },
   },
+  // Kinds of zone admin can label a selection of cells as — purely
+  // descriptive, shown as a small tag under the zone name.
+  STORAGE_ZONE_TYPES: ["Shelf", "Drawer", "Door Bin", "Basket", "Bin", "Other"],
   LEVELS: ["Full", "3/4", "Half", "1/4", "Low", "Empty"],
   LOW_LEVELS: ["1/4", "Low", "Empty"],
 

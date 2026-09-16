@@ -871,6 +871,237 @@ main { min-height: 60vh; }
 }
 
 /* -------------------------------------------------------------------
+   Storage layout — "doll house" overview + per-location grid editor.
+   Used in Admin → Layout, the item form's location/shelf picker, and
+   the Inventory page's mini-map. Black & white: zones are distinguished
+   by border weight and fill, never color.
+   ------------------------------------------------------------------- */
+
+.dollhouse {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-end;
+  padding: 1.5rem 0;
+}
+
+.dollhouse-box {
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-bg);
+  width: 128px;
+  height: calc(96px * max(var(--dh-ratio), 0.5));
+  max-height: 220px;
+  min-height: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.75rem;
+  text-align: center;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.dollhouse-box:hover { background: var(--color-text); color: var(--color-bg); }
+
+.dollhouse-box__grid {
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  opacity: 0.6;
+  line-height: 1.2;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.dollhouse-box__label {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--step-caption);
+  letter-spacing: 0.06em;
+}
+
+.dollhouse-box__count {
+  font-size: 0.68rem;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dollhouse-box:hover .dollhouse-box__count { color: var(--color-bg); opacity: 0.75; }
+
+.storage-grid {
+  display: grid;
+  gap: 4px;
+  position: relative;
+  padding: 4px;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-section-bg);
+  touch-action: none;
+  user-select: none;
+}
+
+.storage-cell {
+  background: var(--color-bg);
+  border: 1px dashed var(--color-border);
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.storage-zone {
+  border: 1.5px solid var(--color-border-strong);
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 0.15rem;
+  padding: 0.25rem;
+  overflow: hidden;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.storage-zone--preview {
+  background: repeating-linear-gradient(45deg, var(--color-border), var(--color-border) 4px, transparent 4px, transparent 8px);
+  border-style: dashed;
+  pointer-events: none;
+}
+
+.storage-zone--highlight { background: var(--color-text); color: var(--color-bg); }
+
+.storage-zone__name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--step-caption);
+  line-height: 1.15;
+}
+
+.storage-zone__type {
+  font-size: 0.65rem;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.storage-zone--highlight .storage-zone__type { color: var(--color-bg); opacity: 0.75; }
+
+.storage-zone__count {
+  font-size: 0.65rem;
+  font-weight: 600;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 0 0.4rem;
+  margin-top: 0.1rem;
+}
+
+.storage-editor {
+  border: 1px solid var(--color-border);
+  padding: 1.25rem;
+  margin: 1.5rem 0;
+}
+
+.layout-all {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1.5rem;
+  padding: 0.5rem 0 2rem;
+}
+
+.layout-all .storage-editor {
+  margin: 0;
+  flex: 1 1 300px;
+  max-width: 460px;
+}
+
+.storage-editor__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.storage-editor__resize {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--step-caption);
+}
+
+.storage-editor__resize input {
+  width: 56px;
+  padding: 0.4rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.storage-editor__hint {
+  font-size: var(--step-caption);
+  color: var(--color-text-secondary);
+  margin-top: 0.75rem;
+}
+
+.location-picker-btn {
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  padding: 0.85rem 1rem;
+  font-size: var(--step-base);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.location-picker-btn:hover { border-color: var(--color-text); }
+
+.location-picker-btn__arrow { color: var(--color-text-secondary); }
+
+.picker-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: var(--step-caption);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.picker-breadcrumb button {
+  text-decoration: underline;
+  color: var(--color-text-secondary);
+}
+
+.mini-map-section {
+  margin: 1.5rem 0 2.5rem;
+}
+
+.mini-map-section__locations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+}
+
+.mini-map-location {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.mini-map-location__title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--step-caption);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* -------------------------------------------------------------------
    Toasts
    ------------------------------------------------------------------- */
 

@@ -20,9 +20,121 @@ const STOPWORDS = new Set([
   "of", "the", "a", "an", "and", "or", "to", "taste", "optional",
 ]);
 
+/**
+ * Known ingredient abbreviations/synonyms, applied as whole-phrase text
+ * substitutions BEFORE tokenizing, so "AP flour" and "all purpose flour"
+ * — or "confectioners' sugar" and "powdered sugar" — collapse to the
+ * exact same normalized text and therefore match each other. Patterns
+ * run against an already-lowercased string; periods/apostrophes/hyphens
+ * are handled per-pattern rather than stripped globally first, since
+ * stripping punctuation before this step would turn "a.p. flour" into
+ * "a p flour" and break the very abbreviation it's meant to catch.
+ *
+ * This list is intentionally about IDENTITY synonyms only — genuinely
+ * interchangeable names for the same product — not close-but-different
+ * variants. "Salted" vs "unsalted" butter and "light" vs "dark" brown
+ * sugar are deliberately left alone, since a recipe calling for one
+ * usually does mean that one specifically.
+ *
+ * Add more over time as you hit them — each entry is just
+ * [pattern, canonical replacement text].
+ */
+const INGREDIENT_ALIASES = [
+  // Flours & starches
+  [/\ba\.?\s?p\.?\s+flour\b/g, "all purpose flour"],
+  [/\bself[\s-]?rising\s+flour\b/g, "self rising flour"],
+  [/\bself[\s-]?raising\s+flour\b/g, "self rising flour"],
+  [/\bcorn\s?starch\b/g, "cornstarch"],
+  [/\btapioca\s+flour\b/g, "tapioca starch"],
+  [/\b00\s+flour\b/g, "tipo 00 flour"],
+  [/\btipo\s+00\s+flour\b/g, "tipo 00 flour"],
+
+  // Sugars
+  [/\bconfectioners?'?\s+sugar\b/g, "powdered sugar"],
+  [/\bicing\s+sugar\b/g, "powdered sugar"],
+  [/\b10x\s+sugar\b/g, "powdered sugar"],
+  [/\bwhite\s+sugar\b/g, "granulated sugar"],
+  [/\bcaster\s+sugar\b/g, "superfine sugar"],
+
+  // Leavening & salt
+  [/\bbicarbonate\s+of\s+soda\b/g, "baking soda"],
+  [/\bbicarb\s+soda\b/g, "baking soda"],
+  [/\bsodium\s+bicarbonate\b/g, "baking soda"],
+  [/\biodi[sz]ed\s+salt\b/g, "table salt"],
+
+  // Fats & oils
+  [/\bveg(?:etable)?\.?\s+oil\b/g, "vegetable oil"],
+  [/\bevoo\b/g, "extra virgin olive oil"],
+
+  // Dairy
+  [/\bhalf\s*(?:&|and)\s*half\b/g, "half and half"],
+  [/\bheavy\s+whipping\s+cream\b/g, "heavy cream"],
+  [/\bwhipping\s+cream\b/g, "heavy cream"],
+
+  // Vinegar & acids
+  [/\bacv\b/g, "apple cider vinegar"],
+  [/\brice\s+wine\s+vinegar\b/g, "rice vinegar"],
+
+  // Aromatics & produce
+  [/\bscallions?\b/g, "green onions"],
+  [/\bspring\s+onions?\b/g, "green onions"],
+  [/\bcoriander\s+leaves\b/g, "cilantro"],
+  [/\bcapsicum\b/g, "bell pepper"],
+  [/\baubergine\b/g, "eggplant"],
+  [/\bcourgette\b/g, "zucchini"],
+
+  // Chilies & spice shorthand
+  [/\bchil[ei]\s+flakes\b/g, "red pepper flakes"],
+  [/\bcrushed\s+red\s+pepper(?:\s+flakes)?\b/g, "red pepper flakes"],
+  [/\bmonosodium\s+glutamate\b/g, "msg"],
+
+  // Common protein/other shorthand
+  [/\bgr(?:ound)?\.?\s+beef\b/g, "ground beef"],
+  [/\bpowd(?:er(?:ed)?)?\.?\s+sugar\b/g, "powdered sugar"],
+
+  // --- British <-> American -------------------------------------------
+  // Same conservative rule as above: only pairs that really are the same
+  // product under a different name. Skipped some famous false friends on
+  // purpose because they're too ambiguous to blanket-replace safely —
+  // UK "chips" (fries) vs "crisps" (US chips) would corrupt "chocolate
+  // chips"/"potato chips" if merged automatically; UK "biscuit" (cookie)
+  // vs US "biscuit" (a completely different baked good) is unresolvable
+  // by text alone; "pudding" is used two different ways even within UK
+  // English. Add narrower rules yourself if you hit a specific case.
+  [/\bplain\s+flour\b/g, "all purpose flour"],
+  [/\bcornflour\b/g, "cornstarch"], // UK cornflour = US cornstarch (NOT the same as US "corn flour")
+  [/\byoghurt\b/g, "yogurt"],
+  [/\bchillies\b/g, "chilies"],
+  [/\bchilli\b/g, "chili"],
+  [/\bprawns?\b/g, "shrimp"],
+  [/\brocket\b/g, "arugula"],
+  [/\bswedes?\b/g, "rutabaga"], // the vegetable, not the country
+  [/\bcoriander\b(?!\s+seeds?)/g, "cilantro"], // UK "coriander" = the leaf; "coriander seeds" is a different, distinct spice — left alone
+  [/\bdouble\s+cream\b/g, "heavy cream"],
+  [/\bsingle\s+cream\b/g, "light cream"],
+  [/\bicing\b/g, "frosting"], // runs after the "icing sugar" rule above, so that phrase is already consumed by then
+  [/\bstock\b/g, "broth"],
+  [/\bbouillon\b/g, "broth"],
+  [/\bsultanas?\b/g, "golden raisins"],
+  [/\bbroad\s+beans?\b/g, "fava beans"],
+  [/\bmange\s?tout\b/g, "snow peas"],
+  [/\bmangetout\b/g, "snow peas"],
+  [/\bpak\s?choi\b/g, "bok choy"],
+  [/\bpak\s?choy\b/g, "bok choy"],
+  [/\bgarbanzo\s+beans?\b/g, "chickpeas"],
+  [/\bblack\s+treacle\b/g, "molasses"],
+  [/\bstreaky\s+bacon\b/g, "bacon"],
+  [/\bback\s+bacon\b/g, "canadian bacon"],
+  [/\b(beef|pork|lamb|turkey|chicken)\s+mince\b/g, "ground $1"],
+  [/\bminced\s+(beef|pork|lamb|turkey|chicken)\b/g, "ground $1"],
+];
+
+function applyIngredientAliases(str) {
+  return INGREDIENT_ALIASES.reduce((acc, [pattern, replacement]) => acc.replace(pattern, replacement), str);
+}
+
 function normalizeText(str) {
-  return (str || "")
-    .toLowerCase()
+  return applyIngredientAliases((str || "").toLowerCase())
     .replace(/[^a-z0-9\s]/g, " ")
     .split(/\s+/)
     .filter((w) => w && !STOPWORDS.has(w))
@@ -56,6 +168,25 @@ function tokenize(str) {
  *   "rice vinegar" -> "Marukan Rice Vinegar"
  * without an external API or heavy fuzzy-matching library.
  */
+/**
+ * The text used to represent an inventory item for matching/searching —
+ * name plus optional type ("Tomato" + "Roma" -> "Tomato Roma"), so a
+ * generic recipe ingredient ("tomato") still matches a specifically-typed
+ * item, while inventoryItemLabel() below keeps them visually distinct.
+ */
+function inventoryItemMatchText(item) {
+  return [item.get("name"), item.get("variant")].filter(Boolean).join(" ");
+}
+
+/**
+ * Display label for an inventory item — "Tomato — Roma" when a type is
+ * set, just "Tomato" otherwise.
+ */
+function inventoryItemLabel(item) {
+  const variant = item.get("variant");
+  return variant ? `${item.get("name")} — ${variant}` : item.get("name") || "";
+}
+
 function ingredientMatchesInventoryItem(ingredientName, inventoryName) {
   const a = tokenize(ingredientName);
   const b = tokenize(inventoryName);
@@ -71,18 +202,70 @@ function ingredientMatchesInventoryItem(ingredientName, inventoryName) {
 }
 
 /**
+ * Strips a trailing purpose/usage clause — "oil FOR FRYING", "butter, for
+ * greasing the pan", "rice, for serving" — down to just the ingredient
+ * itself. Without this, descriptive tail words ("frying", "greasing",
+ * "serving") count against the match-token ratio the same as the actual
+ * ingredient word, so a plain on-hand item like Olive Oil could register
+ * as "missing" purely because the recipe noted what the oil was for.
+ */
+function stripPurposeClause(name) {
+  return (name || "").replace(/[,(]?\s*\bfor\b\s+.+$/i, "").trim();
+}
+
+/**
+ * Splits an ingredient name written as alternatives — "milk or coconut
+ * milk", "cabbage or cucumber or daikon", "citrus juice (yuzu or lemon)" —
+ * into its individual options. Falls back to [name] when there's no "or".
+ *
+ * This matters because ingredientMatchesInventoryItem() above scores a
+ * match by what fraction of an ingredient's own words show up in a single
+ * inventory item name. Fed the whole alternatives phrase as one bag of
+ * words, that fraction silently demands most of BOTH options at once
+ * ("citrus", "juice", "yuzu", AND "lemon") instead of treating them as
+ * genuine alternatives — so having just lemon, or just yuzu juice, could
+ * fail to register as "have" even though either one is exactly what the
+ * recipe means. Splitting first and checking each option independently
+ * gives real OR semantics: any ONE alternative in stock counts as having it.
+ */
+function ingredientAlternatives(name) {
+  if (!name) return [];
+  // Split on "or" FIRST, then clean each resulting piece — cleaning the
+  // whole string before splitting would let a purpose clause on the first
+  // alternative ("oil FOR FRYING or ghee") swallow every alternative after
+  // it, since "for ... " strips to the end of whatever string it's run on.
+  const parts = name
+    .split(/\s+or\s+/i)
+    .map((p) => stripPurposeClause(p.replace(/[()]/g, "")).trim())
+    .filter(Boolean);
+  return parts.length ? parts : [name];
+}
+
+/**
+ * Checks one recipe ingredient against the full inventory, honoring "X or
+ * Y" alternatives (see ingredientAlternatives above) — having ANY ONE
+ * alternative in stock counts as available.
+ */
+function matchIngredientAgainstInventory(ingredientName, inventoryItems) {
+  for (const alt of ingredientAlternatives(ingredientName)) {
+    const matchedItem = inventoryItems.find((item) => ingredientMatchesInventoryItem(alt, inventoryItemMatchText(item)));
+    if (matchedItem) return { have: true, matchedItem, matchedAlternative: alt };
+  }
+  return { have: false, matchedItem: null, matchedAlternative: null };
+}
+
+/**
  * Given a recipe's ingredients array and the full inventory list,
- * returns a status per ingredient: { ingredient, have, matchedItem }
+ * returns a status per ingredient: { ingredient, have, matchedItem, matchedAlternative }
  */
 function computeIngredientAvailability(ingredients, inventoryItems) {
   return (ingredients || []).map((ing) => {
-    const matched = inventoryItems.find((item) =>
-      ingredientMatchesInventoryItem(ing.name, item.get("name"))
-    );
+    const match = matchIngredientAgainstInventory(ing.name, inventoryItems);
     return {
       ingredient: ing,
-      have: !!matched,
-      matchedItem: matched || null,
+      have: match.have,
+      matchedItem: match.matchedItem,
+      matchedAlternative: match.matchedAlternative,
     };
   });
 }

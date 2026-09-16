@@ -188,12 +188,14 @@ function openRecipeDetail(recipe) {
   const usedBy = findRecipesThatUse(recipe, allRecipes);
 
   const ingredientRows = readiness.ownAvailability
-    .map(({ ingredient, have }) => {
+    .map(({ ingredient, have, matchedAlternative }) => {
       const qty = [ingredient.quantity, ingredient.unit].filter(Boolean).join(" ");
+      const showsAlt = have && matchedAlternative && normalizeText(matchedAlternative) !== normalizeText(ingredient.name);
+      const statusText = have ? `✓ HAVE${showsAlt ? ` — ${escapeHtml(titleCase(matchedAlternative))}` : ""}` : "— MISSING";
       return `
         <li>
           <span>${escapeHtml([qty, ingredient.name].filter(Boolean).join(" "))}${ingredient.optional ? " (optional)" : ""}</span>
-          <span class="ingredient-status ${have ? "ingredient-status--have" : "ingredient-status--missing"}">${have ? "✓ HAVE" : "— MISSING"}</span>
+          <span class="ingredient-status ${have ? "ingredient-status--have" : "ingredient-status--missing"}">${statusText}</span>
         </li>`;
     })
     .join("");

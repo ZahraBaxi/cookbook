@@ -18,6 +18,9 @@ let editingRecipeId = null;
 let pendingConfirmAction = null; // async function to run when the shared confirm modal is confirmed
 let currentSimilarIngredientGroups = [];
 let currentSimilarTagGroups = [];
+let currentSimilarInventoryGroups = [];
+let storageLayouts = {}; // location -> { objectId, rows, cols, zones } — see storage-layout.js
+let zoneModalContext = null; // { location, zone|null, rect|null, onSaved } — see storage-layout.js
 
 /* ---------------------------------------------------------------------
  * Login
@@ -75,21 +78,24 @@ function handleLogout() {
  * ------------------------------------------------------------------- */
 
 function initTabs() {
-  const tabInventory = document.getElementById("tab-inventory");
-  const tabRecipes = document.getElementById("tab-recipes");
-  const panelInventory = document.getElementById("panel-inventory");
-  const panelRecipes = document.getElementById("panel-recipes");
+  const tabs = {
+    inventory: { tab: document.getElementById("tab-inventory"), panel: document.getElementById("panel-inventory") },
+    recipes: { tab: document.getElementById("tab-recipes"), panel: document.getElementById("panel-recipes") },
+    layout: { tab: document.getElementById("tab-layout"), panel: document.getElementById("panel-layout") },
+  };
 
-  function activate(tab) {
-    const inv = tab === "inventory";
-    tabInventory.setAttribute("aria-selected", String(inv));
-    tabRecipes.setAttribute("aria-selected", String(!inv));
-    panelInventory.hidden = !inv;
-    panelRecipes.hidden = inv;
+  function activate(name) {
+    Object.entries(tabs).forEach(([key, { tab, panel }]) => {
+      const active = key === name;
+      tab.setAttribute("aria-selected", String(active));
+      panel.hidden = !active;
+    });
+    if (name === "layout") activateLayoutTab();
   }
 
-  tabInventory.addEventListener("click", () => activate("inventory"));
-  tabRecipes.addEventListener("click", () => activate("recipes"));
+  tabs.inventory.tab.addEventListener("click", () => activate("inventory"));
+  tabs.recipes.tab.addEventListener("click", () => activate("recipes"));
+  tabs.layout.tab.addEventListener("click", () => activate("layout"));
 }
 
 /* ---------------------------------------------------------------------
@@ -103,10 +109,173 @@ async function loadAdminInventory() {
     adminInventoryItems = await new Parse.Query(InventoryItemClass).ascending("name").limit(2000).find();
     renderAdminInventoryList();
     renderMissingIngredients();
+    renderSimilarInventory();
   } catch (err) {
     console.error(err);
     listEl.innerHTML = `<div class="empty-state"><p class="empty-state__title">Couldn't load inventory.</p></div>`;
   }
+}
+
+/* ---------------------------------------------------------------------
+ * Similar inventory items — same idea as the "Similar Ingredient
+ * Names"/"Similar Tags" tools under Recipes, but for actual InventoryItem
+ * records. Catches things like "Tomato" and "Tomatoes" ending up as two
+ * separate rows — easy to do from repeated manual entry, or importing a
+ * written shopping/pantry list — which then silently double-count on the
+ * "Needed for Recipes" report and the Layout mini-map.
+ * ------------------------------------------------------------------- */
+
+function computeSimilarInventoryGroups() {
+  const items = adminInventoryItems.filter((i) => i.get("name"));
+  const used = new Set(); // objectIds already placed in a group
+  const rawGroups = []; // { items: InventoryItem[], fuzzy: boolean, reason: "exact"|"type"|"words" }
+
+  // Tier 1 — exact match: same normalized name AND same normalized Type.
+  // Two different Types of the same base name ("Tomato"/Roma vs
+  // "Tomato"/Cherry) are treated as deliberately distinct, not
+  // duplicates — that's the whole point of the Type field — so they're
+  // never grouped here even though the base name matches.
+  const exactMap = new Map();
+  items.forEach((item) => {
+    const nameKey = normalizeText(item.get("name"));
+    if (!nameKey) return;
+    const key = nameKey + "::" + normalizeText(item.get("variant") || "");
+    if (!exactMap.has(key)) exactMap.set(key, []);
+    exactMap.get(key).push(item);
+  });
+  exactMap.forEach((group) => {
+    if (group.length < 2) return;
+    group.forEach((i) => used.add(i.id));
+    rawGroups.push({ items: group, fuzzy: false, reason: "exact" });
+  });
+
+  // Tier 2 — same base name, but Type set on only one side ("Tomato" vs
+  // "Tomato" / Roma). Worth a look — maybe the untyped one is really an
+  // old-style duplicate that should have been given the same Type, or
+  // merged in — but NOT when both sides have a Type and they differ
+  // (that's the explicit "these are different" signal, respected as-is).
+  const remaining1 = items.filter((i) => !used.has(i.id));
+  const byName = new Map();
+  remaining1.forEach((item) => {
+    const nameKey = normalizeText(item.get("name"));
+    if (!nameKey) return;
+    if (!byName.has(nameKey)) byName.set(nameKey, []);
+    byName.get(nameKey).push(item);
+  });
+  byName.forEach((group) => {
+    if (group.length < 2) return;
+    const untyped = group.filter((i) => !normalizeText(i.get("variant") || ""));
+    const typed = group.filter((i) => normalizeText(i.get("variant") || ""));
+    if (!untyped.length || !typed.length) return; // all untyped (tier 1 already caught exact dupes) or all distinctly typed — leave alone
+    untyped.forEach((u) => {
+      typed.forEach((t) => {
+        rawGroups.push({ items: [u, t], fuzzy: true, reason: "type" });
+        used.add(u.id);
+        used.add(t.id);
+      });
+    });
+  });
+
+  // Tier 3 — fuzzy: one item's whole set of words (name + Type together)
+  // is contained in another's ("Cabbage" inside "Napa Cabbage", "Milk"
+  // inside "Whole Milk"). Lower confidence on purpose — a plain onion and
+  // a green onion are genuinely different things despite one containing
+  // the other's word — so these are still surfaced for a human to judge,
+  // not folded in as certain duplicates.
+  const remaining2 = items.filter((i) => !used.has(i.id));
+  const paired = new Set();
+  for (let i = 0; i < remaining2.length; i++) {
+    if (paired.has(remaining2[i].id)) continue;
+    const tokensI = new Set(tokenize(inventoryItemMatchText(remaining2[i])));
+    if (!tokensI.size) continue;
+    for (let j = i + 1; j < remaining2.length; j++) {
+      if (paired.has(remaining2[j].id)) continue;
+      const tokensJ = new Set(tokenize(inventoryItemMatchText(remaining2[j])));
+      if (!tokensJ.size || tokensI.size === tokensJ.size) continue;
+      const [smaller, larger] = tokensI.size < tokensJ.size ? [tokensI, tokensJ] : [tokensJ, tokensI];
+      const isSubset = [...smaller].every((tok) => larger.has(tok));
+      if (!isSubset) continue;
+      rawGroups.push({ items: [remaining2[i], remaining2[j]], fuzzy: true, reason: "words" });
+      paired.add(remaining2[i].id);
+      paired.add(remaining2[j].id);
+      break;
+    }
+  }
+
+  return rawGroups
+    .map(({ items: groupItems, fuzzy, reason }) => {
+      // Canonical = whichever record has the most useful data to keep —
+      // higher quantity, then has notes, then the longer/more descriptive
+      // label ("Napa Cabbage" over "Cabbage", "Tomato — Roma" over "Tomato").
+      const sorted = [...groupItems].sort((a, b) => {
+        return (
+          (b.get("quantity") || 0) - (a.get("quantity") || 0) ||
+          (b.get("notes") ? 1 : 0) - (a.get("notes") ? 1 : 0) ||
+          (inventoryItemLabel(b) || "").length - (inventoryItemLabel(a) || "").length
+        );
+      });
+      return { canonical: sorted[0], duplicates: sorted.slice(1), fuzzy, reason };
+    })
+    .sort((a, b) => (inventoryItemLabel(a.canonical) || "").localeCompare(inventoryItemLabel(b.canonical) || ""));
+}
+
+function renderSimilarInventory() {
+  const container = document.getElementById("similar-inventory-list");
+  if (!container) return;
+
+  currentSimilarInventoryGroups = computeSimilarInventoryGroups();
+  if (currentSimilarInventoryGroups.length === 0) {
+    container.innerHTML = `<p class="admin-missing-empty">No similar inventory items found.</p>`;
+    return;
+  }
+
+  const tagText = { type: "different type?", words: "possible" };
+
+  container.innerHTML = currentSimilarInventoryGroups
+    .map((g, idx) => {
+      const location = [g.canonical.get("location"), g.canonical.get("shelf")].filter(Boolean).join(" · ");
+      const detail = `Also listed as: ${g.duplicates.map((i) => inventoryItemLabel(i)).join(", ")}${location ? ` — ${location}` : ""}`;
+      const tag = tagText[g.reason];
+      return `
+      <div class="missing-ingredient-row">
+        <div>
+          <div class="missing-ingredient-row__name">${escapeHtml(inventoryItemLabel(g.canonical))}${tag ? ` <span class="missing-ingredient-row__tag">${tag}</span>` : ""}</div>
+          <div class="missing-ingredient-row__recipes">${escapeHtml(detail)}</div>
+        </div>
+        <button type="button" class="btn btn--small btn--primary" data-merge-inventory-group="${idx}">MERGE</button>
+      </div>`;
+    })
+    .join("");
+
+  container.querySelectorAll("[data-merge-inventory-group]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const idx = parseInt(btn.getAttribute("data-merge-inventory-group"), 10);
+      confirmMergeInventoryGroup(currentSimilarInventoryGroups[idx]);
+    });
+  });
+}
+
+function confirmMergeInventoryGroup(group) {
+  const keepName = inventoryItemLabel(group.canonical);
+  const dropNames = group.duplicates.map((i) => inventoryItemLabel(i)).join(", ");
+  let warning = "";
+  if (group.reason === "type") {
+    warning = ` One of these has no Type set and the other is typed — double check whether the untyped one should really be merged into "${keepName}" (same specific type) rather than kept as a separate, more generic batch.`;
+  } else if (group.reason === "words") {
+    warning = ` These were flagged as only POSSIBLY the same thing (one name's words are contained in the other's) — double check "${dropNames}" is really the same item as "${keepName}" and not a genuinely different ingredient before merging.`;
+  }
+  openConfirmModal(
+    "Merge duplicate inventory items?",
+    `Keeps "${keepName}" — its quantity, shelf, and notes stay exactly as they are — and removes ${group.duplicates.length === 1 ? "the other entry" : "the other entries"}: ${dropNames}. If they represented separate amounts you actually have, add that quantity to "${keepName}" yourself afterward — merging won't add them together automatically since units may not match.${warning}`,
+    "MERGE",
+    async () => {
+      for (const dup of group.duplicates) {
+        await runAdminCloud("adminDeleteInventoryItem", { id: dup.id });
+      }
+      showToast(`Merged into "${keepName}".`);
+      await loadAdminInventory();
+    }
+  );
 }
 
 /* ---------------------------------------------------------------------
@@ -120,8 +289,8 @@ function computeMissingIngredients() {
   adminRecipes.forEach((recipe) => {
     (recipe.get("ingredients") || []).forEach((ing) => {
       if (!ing.name) return;
-      const alreadyHave = adminInventoryItems.some((item) => ingredientMatchesInventoryItem(ing.name, item.get("name")));
-      if (alreadyHave) return;
+      const { have } = matchIngredientAgainstInventory(ing.name, adminInventoryItems);
+      if (have) return;
       const key = normalizeText(ing.name);
       if (!key) return;
       if (!missingMap.has(key)) {
@@ -151,16 +320,18 @@ function renderMissingIngredients() {
   }
 
   container.innerHTML = missing
-    .map(
-      (entry) => `
+    .map((entry) => {
+      // "milk or coconut milk" -> add just "milk" by default, not the whole phrase.
+      const addName = ingredientAlternatives(entry.name)[0];
+      return `
       <div class="missing-ingredient-row">
         <div>
           <div class="missing-ingredient-row__name">${escapeHtml(titleCase(entry.name))}${entry.requiredSomewhere ? "" : ' <span class="missing-ingredient-row__tag">optional</span>'}</div>
           <div class="missing-ingredient-row__recipes">${escapeHtml(Array.from(entry.recipes).join(", "))}</div>
         </div>
-        <button type="button" class="btn btn--small btn--primary" data-add-missing="${escapeHtml(entry.name)}">+ ADD</button>
-      </div>`
-    )
+        <button type="button" class="btn btn--small btn--primary" data-add-missing="${escapeHtml(addName)}">+ ADD</button>
+      </div>`;
+    })
     .join("");
 
   container.querySelectorAll("[data-add-missing]").forEach((btn) => {
@@ -173,7 +344,7 @@ function renderAdminInventoryList() {
   const query = document.getElementById("admin-inventory-search").value.trim().toLowerCase();
   const filtered = adminInventoryItems.filter((item) => {
     if (!query) return true;
-    return [item.get("name"), item.get("category"), item.get("location")].filter(Boolean).join(" ").toLowerCase().includes(query);
+    return [item.get("name"), item.get("variant"), item.get("category"), item.get("location")].filter(Boolean).join(" ").toLowerCase().includes(query);
   });
 
   if (adminInventoryItems.length === 0) {
@@ -189,7 +360,7 @@ function renderAdminInventoryList() {
     .map(
       (item) => `
       <div class="admin-row">
-        <div class="admin-row__title">${escapeHtml(item.get("name"))}</div>
+        <div class="admin-row__title">${escapeHtml(inventoryItemLabel(item))}</div>
         <div>${escapeHtml(item.get("category") || "")}</div>
         <div>${escapeHtml(item.get("location") || "")}${item.get("shelf") ? " · " + escapeHtml(item.get("shelf")) : ""}</div>
         <div>${escapeHtml((item.get("level") || "").toUpperCase())}</div>
@@ -209,21 +380,60 @@ function renderAdminInventoryList() {
  * Inventory item form
  * ------------------------------------------------------------------- */
 
-function populateCategoryAndLocationSelects() {
+function populateCategorySelect() {
   const categorySelect = document.getElementById("item-category");
   categorySelect.innerHTML = CONFIG.INVENTORY_CATEGORIES.map((c) => `<option value="${c}">${c}</option>`).join("");
-
-  const locationSelect = document.getElementById("item-location");
-  locationSelect.innerHTML = CONFIG.INVENTORY_LOCATIONS.map((l) => `<option value="${l}">${l}</option>`).join("");
 }
 
-function updateShelfOptions() {
-  const location = document.getElementById("item-location").value;
-  const shelfSelect = document.getElementById("item-shelf");
-  const options = CONFIG.SHELF_OPTIONS[location] || ["Other"];
-  const current = shelfSelect.value;
-  shelfSelect.innerHTML = options.map((s) => `<option value="${s}">${s}</option>`).join("");
-  if (options.includes(current)) shelfSelect.value = current;
+/* ---------------------------------------------------------------------
+ * Location/shelf picker — the "doll house" grid replaces the old
+ * Location + Shelf dropdowns entirely. It reads/writes the same two
+ * hidden fields (#item-location, #item-shelf) the rest of the form and
+ * the Cloud Functions already expect, so nothing downstream changes.
+ * ------------------------------------------------------------------- */
+
+function setLocationPickerValue(location, shelf) {
+  document.getElementById("item-location").value = location || "";
+  document.getElementById("item-shelf").value = shelf || "";
+  document.getElementById("item-location-picker-label").textContent = location ? (shelf ? `${location} · ${shelf}` : location) : "Not set";
+}
+
+async function openLocationPickerModal() {
+  storageLayouts = await loadStorageLayouts();
+  renderLocationPickerDollhouse();
+  openModal(document.getElementById("location-picker-modal-overlay"));
+}
+
+function renderLocationPickerDollhouse() {
+  document.getElementById("location-picker-breadcrumb").innerHTML = "";
+  document.getElementById("location-picker-grid-wrap").hidden = true;
+  const container = document.getElementById("location-picker-dollhouse");
+  container.hidden = false;
+  renderDollhouse(container, { layouts: storageLayouts, onSelect: renderLocationPickerGrid });
+}
+
+function renderLocationPickerGrid(location) {
+  document.getElementById("location-picker-dollhouse").hidden = true;
+  document.getElementById("location-picker-grid-wrap").hidden = false;
+
+  const breadcrumb = document.getElementById("location-picker-breadcrumb");
+  breadcrumb.innerHTML = `<button type="button" class="btn btn--ghost btn--small" id="location-picker-back-btn">← LOCATIONS</button>`;
+  breadcrumb.querySelector("#location-picker-back-btn").addEventListener("click", renderLocationPickerDollhouse);
+
+  const layout = storageLayouts[location];
+  renderStorageGrid(document.getElementById("location-picker-grid"), {
+    layout,
+    mode: "pick",
+    onZoneClick: (zone) => {
+      setLocationPickerValue(location, zone.name);
+      closeModal(document.getElementById("location-picker-modal-overlay"));
+    },
+  });
+
+  document.getElementById("location-picker-no-shelf-btn").onclick = () => {
+    setLocationPickerValue(location, "");
+    closeModal(document.getElementById("location-picker-modal-overlay"));
+  };
 }
 
 function renderLevelSelector(selected) {
@@ -248,7 +458,7 @@ function openItemForm(itemId, prefillName) {
   editingItemId = itemId || null;
   const form = document.getElementById("item-form");
   form.reset();
-  populateCategoryAndLocationSelects();
+  populateCategorySelect();
 
   const item = itemId ? adminInventoryItems.find((i) => i.id === itemId) : null;
 
@@ -257,10 +467,9 @@ function openItemForm(itemId, prefillName) {
 
   if (item) {
     document.getElementById("item-name").value = item.get("name") || "";
+    document.getElementById("item-variant").value = item.get("variant") || "";
     document.getElementById("item-category").value = item.get("category") || CONFIG.INVENTORY_CATEGORIES[0];
-    document.getElementById("item-location").value = item.get("location") || CONFIG.INVENTORY_LOCATIONS[0];
-    updateShelfOptions();
-    document.getElementById("item-shelf").value = item.get("shelf") || "Other";
+    setLocationPickerValue(item.get("location"), item.get("shelf"));
     document.getElementById("item-quantity").value = item.get("quantity") ?? "";
     document.getElementById("item-unit").value = item.get("unit") || "";
     const exp = item.get("expirationDate");
@@ -269,9 +478,10 @@ function openItemForm(itemId, prefillName) {
     document.getElementById("item-level").value = item.get("level") || "Full";
     renderLevelSelector(item.get("level") || "Full");
   } else {
-    updateShelfOptions();
+    setLocationPickerValue(null, null);
     document.getElementById("item-level").value = "Full";
     renderLevelSelector("Full");
+    document.getElementById("item-variant").value = "";
     if (prefillName) {
       document.getElementById("item-name").value = titleCase(prefillName);
     }
@@ -282,12 +492,19 @@ function openItemForm(itemId, prefillName) {
 
 async function handleItemFormSubmit(e) {
   e.preventDefault();
+
+  if (!document.getElementById("item-location").value) {
+    showToast("Pick a spot for this item first.", "error");
+    return;
+  }
+
   const submitBtn = e.target.querySelector('button[type="submit"]');
   submitBtn.disabled = true;
   submitBtn.textContent = "SAVING…";
 
   const payload = {
     name: document.getElementById("item-name").value.trim(),
+    variant: document.getElementById("item-variant").value.trim(),
     category: document.getElementById("item-category").value,
     location: document.getElementById("item-location").value,
     shelf: document.getElementById("item-shelf").value,
@@ -329,6 +546,166 @@ function handleItemDeleteClick() {
       showToast("Item removed.");
       closeModal(document.getElementById("item-modal-overlay"));
       await loadAdminInventory();
+    }
+  );
+}
+
+/* ---------------------------------------------------------------------
+ * Layout tab — the "doll house" grid editor for cupboards/fridge/etc.
+ * Every location renders expanded, side by side, all editable at once —
+ * a straight-on cutaway of the whole kitchen rather than one-at-a-time
+ * drill-in. See storage-layout.js for the grid rendering + drag-to-draw.
+ * ------------------------------------------------------------------- */
+
+async function activateLayoutTab() {
+  storageLayouts = await loadStorageLayouts();
+  renderAllLayouts();
+}
+
+function renderAllLayouts() {
+  const container = document.getElementById("layout-all");
+  container.className = "layout-all";
+  container.innerHTML = "";
+  CONFIG.INVENTORY_LOCATIONS.forEach((location) => {
+    container.appendChild(buildLocationEditorBlock(location));
+  });
+}
+
+function buildLocationEditorBlock(location) {
+  const block = document.createElement("div");
+  block.className = "storage-editor";
+
+  const head = document.createElement("div");
+  head.className = "storage-editor__head";
+  head.innerHTML = `<h2 style="font-size:var(--step-medium);">${escapeHtml(location.toUpperCase())}</h2>`;
+
+  const resizeWrap = document.createElement("div");
+  resizeWrap.className = "storage-editor__resize";
+  const layout = storageLayouts[location];
+  resizeWrap.innerHTML = `
+    <label>Rows</label>
+    <input type="number" min="1" max="12" value="${layout.rows}" class="layout-rows-input" />
+    <label>Cols</label>
+    <input type="number" min="1" max="12" value="${layout.cols}" class="layout-cols-input" />
+    <button type="button" class="btn btn--ghost btn--small layout-resize-btn">RESIZE</button>
+  `;
+  head.appendChild(resizeWrap);
+  block.appendChild(head);
+
+  const gridEl = document.createElement("div");
+  block.appendChild(gridEl);
+
+  const hint = document.createElement("p");
+  hint.className = "storage-editor__hint";
+  hint.textContent = "Drag across empty cells to mark a new zone. Click a zone to rename, retype, or delete it.";
+  block.appendChild(hint);
+
+  function renderGrid() {
+    renderStorageGrid(gridEl, {
+      layout: storageLayouts[location],
+      mode: "edit",
+      onDraw: (rect) => openZoneModal(location, null, rect, renderGrid),
+      onZoneClick: (zone) => openZoneModal(location, zone, null, renderGrid),
+    });
+  }
+  renderGrid();
+
+  resizeWrap.querySelector(".layout-resize-btn").addEventListener("click", async () => {
+    const rows = Math.max(1, parseInt(resizeWrap.querySelector(".layout-rows-input").value, 10) || 1);
+    const cols = Math.max(1, parseInt(resizeWrap.querySelector(".layout-cols-input").value, 10) || 1);
+    const layoutObj = storageLayouts[location];
+    const kept = (layoutObj.zones || []).filter((z) => z.rowEnd < rows && z.colEnd < cols);
+    const droppedCount = layoutObj.zones.length - kept.length;
+    layoutObj.rows = rows;
+    layoutObj.cols = cols;
+    layoutObj.zones = kept;
+    try {
+      await saveLayoutFor(location);
+      renderGrid();
+      showToast(droppedCount ? `Resized — ${droppedCount} zone(s) outside the new size were removed.` : "Resized.");
+    } catch (err) {
+      console.error(err);
+      showToast(err.message || "Couldn't resize.", "error");
+    }
+  });
+
+  return block;
+}
+
+async function saveLayoutFor(location) {
+  const layout = storageLayouts[location];
+  const saved = await runAdminCloud("adminSaveStorageLayout", {
+    location,
+    rows: layout.rows,
+    cols: layout.cols,
+    zones: layout.zones,
+  });
+  layout.objectId = saved.objectId;
+}
+
+function openZoneModal(location, zone, rect, onSaved) {
+  zoneModalContext = { location, zone, rect, onSaved };
+  const typeSelect = document.getElementById("zone-type");
+  typeSelect.innerHTML = CONFIG.STORAGE_ZONE_TYPES.map((t) => `<option value="${t}">${t}</option>`).join("");
+  document.getElementById("zone-modal-title").textContent = zone ? "Edit zone" : "New zone";
+  document.getElementById("zone-name").value = zone ? zone.name : "";
+  typeSelect.value = zone ? zone.type : CONFIG.STORAGE_ZONE_TYPES[0];
+  document.getElementById("zone-delete-btn").hidden = !zone;
+  openModal(document.getElementById("zone-modal-overlay"));
+}
+
+async function handleZoneFormSubmit(e) {
+  e.preventDefault();
+  const name = document.getElementById("zone-name").value.trim();
+  if (!name) return;
+  const type = document.getElementById("zone-type").value;
+  const { location, zone, rect, onSaved } = zoneModalContext;
+  const layout = storageLayouts[location];
+
+  if (zone) {
+    const existing = layout.zones.find((z) => z.id === zone.id);
+    existing.name = name;
+    existing.type = type;
+  } else {
+    layout.zones.push({
+      id: "zone-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8),
+      name,
+      type,
+      ...rect,
+    });
+  }
+
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+  submitBtn.textContent = "SAVING…";
+  try {
+    await saveLayoutFor(location);
+    closeModal(document.getElementById("zone-modal-overlay"));
+    if (onSaved) onSaved();
+    showToast("Zone saved.");
+  } catch (err) {
+    console.error(err);
+    showToast(err.message || "Couldn't save zone.", "error");
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = "SAVE";
+  }
+}
+
+function handleZoneDeleteClick() {
+  if (!zoneModalContext || !zoneModalContext.zone) return;
+  const { location, zone, onSaved } = zoneModalContext;
+  openConfirmModal(
+    "Delete this zone?",
+    `"${zone.name}" will be removed from the layout. Items already tagged with it keep their text label but the zone won't show on the map anymore.`,
+    "DELETE",
+    async () => {
+      const layout = storageLayouts[location];
+      layout.zones = layout.zones.filter((z) => z.id !== zone.id);
+      await saveLayoutFor(location);
+      closeModal(document.getElementById("zone-modal-overlay"));
+      if (onSaved) onSaved();
+      showToast("Zone deleted.");
     }
   );
 }
@@ -739,8 +1116,15 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("item-cancel-btn").addEventListener("click", () => closeModal(document.getElementById("item-modal-overlay")));
   document.getElementById("item-modal-close").addEventListener("click", () => closeModal(document.getElementById("item-modal-overlay")));
   document.getElementById("item-delete-btn").addEventListener("click", handleItemDeleteClick);
-  document.getElementById("item-location").addEventListener("change", updateShelfOptions);
+  document.getElementById("item-location-picker-btn").addEventListener("click", openLocationPickerModal);
+  document.getElementById("location-picker-modal-close").addEventListener("click", () => closeModal(document.getElementById("location-picker-modal-overlay")));
   document.getElementById("admin-inventory-search").addEventListener("input", renderAdminInventoryList);
+
+  // Layout
+  document.getElementById("zone-form").addEventListener("submit", handleZoneFormSubmit);
+  document.getElementById("zone-cancel-btn").addEventListener("click", () => closeModal(document.getElementById("zone-modal-overlay")));
+  document.getElementById("zone-modal-close").addEventListener("click", () => closeModal(document.getElementById("zone-modal-overlay")));
+  document.getElementById("zone-delete-btn").addEventListener("click", handleZoneDeleteClick);
 
   // Recipes
   document.getElementById("add-recipe-btn").addEventListener("click", () => openRecipeForm(null));
