@@ -317,7 +317,7 @@ async function handleCopyInventoryClick() {
   const text = buildInventoryExportText();
   try {
     await navigator.clipboard.writeText(text);
-    showToast("Copied — paste it into ChatGPT, Claude, or anywhere else.");
+    showToast("Copied!");
   } catch (err) {
     console.error(err);
     // Clipboard API can be blocked in some contexts (non-HTTPS, older
