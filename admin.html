@@ -19,6 +19,7 @@
     <ul class="nav-links">
       <li><a href="cookbook.html">COOKBOOK</a></li>
       <li><a href="inventory.html">INVENTORY</a></li>
+      <li><a href="groceries.html">GROCERIES</a></li>
       <li><a href="admin.html" aria-current="page">ADMIN</a></li>
     </ul>
   </nav>
@@ -62,19 +63,26 @@
       <button class="admin-tab" role="tab" id="tab-inventory" aria-selected="true" aria-controls="panel-inventory">INVENTORY</button>
       <button class="admin-tab" role="tab" id="tab-recipes" aria-selected="false" aria-controls="panel-recipes">RECIPES</button>
       <button class="admin-tab" role="tab" id="tab-layout" aria-selected="false" aria-controls="panel-layout">LAYOUT</button>
+      <button class="admin-tab" role="tab" id="tab-groceries" aria-selected="false" aria-controls="panel-groceries">GROCERIES</button>
     </div>
 
     <!-- Inventory panel -->
     <div id="panel-inventory" role="tabpanel" aria-labelledby="tab-inventory">
       <div class="admin-missing-section" id="admin-missing-section">
-        <div class="admin-missing-section__title">NEEDED FOR RECIPES</div>
+        <div class="admin-missing-section__header">
+          <div class="admin-missing-section__title">NEEDED FOR RECIPES</div>
+          <button type="button" class="admin-missing-section__toggle" id="toggle-missing-ingredients" aria-expanded="true">HIDE</button>
+        </div>
         <div id="missing-ingredients-list">
           <div class="loading-row">Loading…</div>
         </div>
       </div>
 
       <div class="admin-missing-section" id="admin-similar-inventory-section">
-        <div class="admin-missing-section__title">SIMILAR INVENTORY ITEMS</div>
+        <div class="admin-missing-section__header">
+          <div class="admin-missing-section__title">SIMILAR INVENTORY ITEMS</div>
+          <button type="button" class="admin-missing-section__toggle" id="toggle-similar-inventory" aria-expanded="true">HIDE</button>
+        </div>
         <div id="similar-inventory-list">
           <div class="loading-row">Loading…</div>
         </div>
@@ -130,11 +138,27 @@
       </p>
       <div id="layout-all"></div>
     </div>
+
+    <!-- Groceries panel (shopping locations only — the actual list lives on groceries.html, PIN-gated) -->
+    <div id="panel-groceries" role="tabpanel" aria-labelledby="tab-groceries" hidden>
+      <p class="admin-missing-empty" style="padding:1rem 0;">
+        Set up the places you shop, each with an emoji so they're easy to spot at a glance. These
+        show up as options on <a href="groceries.html" target="_blank" rel="noopener">groceries.html</a> —
+        the actual shopping list (add items, check them off) is PIN-gated separately from admin, so
+        it's easy to hand off without giving out full admin access.
+      </p>
+      <div class="admin-table-toolbar">
+        <button type="button" class="btn btn--primary" id="add-grocery-location-btn">+ ADD LOCATION</button>
+      </div>
+      <div id="grocery-locations-list">
+        <div class="loading-row">Loading…</div>
+      </div>
+    </div>
   </section>
 </main>
 
 <footer class="site-footer">
-  <div class="shell">A personal kitchen archive.</div>
+  <div class="shell" data-site-footer>Zahra's Kitchen.</div>
 </footer>
 
 <!-- Inventory item form modal -->
@@ -302,6 +326,37 @@
         <button type="submit" class="btn btn--primary">SAVE</button>
         <button type="button" class="btn btn--ghost" id="zone-cancel-btn">CANCEL</button>
         <button type="button" class="btn btn--danger" id="zone-delete-btn" hidden style="margin-left:auto;">DELETE</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Grocery location edit modal (Admin → Groceries) -->
+<div class="modal-overlay" id="grocery-location-modal-overlay" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="grocery-location-modal-title" style="max-width:420px;">
+    <button class="modal__close" id="grocery-location-modal-close" aria-label="Close">&times;</button>
+    <h2 id="grocery-location-modal-title">New location</h2>
+    <form id="grocery-location-form" novalidate>
+      <div class="form-grid form-grid--single">
+        <div class="field">
+          <label for="grocery-location-emoji">Emoji</label>
+          <input type="text" id="grocery-location-emoji" name="emoji" placeholder="🥕" style="max-width:5rem; font-size:1.4rem; text-align:center;" />
+        </div>
+        <div class="field">
+          <label for="grocery-location-name">Name</label>
+          <input type="text" id="grocery-location-name" name="name" data-autofocus required placeholder="Sac Central Farmers Market" />
+        </div>
+        <div class="field">
+          <label class="checkbox-field">
+            <input type="checkbox" id="grocery-location-bulk" name="hasBulkBins" />
+            <span>This store has a bulk bin section</span>
+          </label>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn--primary">SAVE</button>
+        <button type="button" class="btn btn--ghost" id="grocery-location-cancel-btn">CANCEL</button>
+        <button type="button" class="btn btn--danger" id="grocery-location-delete-btn" hidden style="margin-left:auto;">DELETE</button>
       </div>
     </form>
   </div>

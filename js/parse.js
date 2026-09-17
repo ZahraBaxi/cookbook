@@ -41,3 +41,32 @@ async function runAdminCloud(name, params = {}) {
   const token = getAdminToken();
   return Parse.Cloud.run(name, { ...params, adminToken: token });
 }
+
+/**
+ * Same idea as the admin session helpers above, but for the grocery
+ * list's 4-digit PIN gate — a much lighter-weight, low-stakes check
+ * meant to keep casual visitors out, not withstand a determined
+ * attacker (same spirit as the housewarming site's shared password).
+ * Uses localStorage rather than sessionStorage so it survives closing
+ * the browser/app on a phone at the store.
+ */
+function getGroceryToken() {
+  return localStorage.getItem(CONFIG.GROCERY_TOKEN_KEY) || null;
+}
+
+function isGroceryUnlocked() {
+  return !!getGroceryToken();
+}
+
+function setGrocerySession(token) {
+  localStorage.setItem(CONFIG.GROCERY_TOKEN_KEY, token);
+}
+
+function clearGrocerySession() {
+  localStorage.removeItem(CONFIG.GROCERY_TOKEN_KEY);
+}
+
+async function runGroceryCloud(name, params = {}) {
+  const token = getGroceryToken();
+  return Parse.Cloud.run(name, { ...params, groceryToken: token });
+}

@@ -24,14 +24,24 @@
  *      the visual doll-house grid used in Admin → Layout. All of them
  *      use the Master Key internally (so they work regardless of
  *      Class-Level Permissions) but are gated by requireAdmin().
+ *   4. A separate, much lighter PIN gate for the grocery list
+ *      (groceries.html) — groceryLogin checks a 4-digit PIN (not the
+ *      admin password) and writes a GrocerySession record; adding/
+ *      removing grocery items goes through requireGroceryAccess()
+ *      instead of requireAdmin(). This is intentionally low-stakes,
+ *      the same spirit as the housewarming site's shared password —
+ *      meant to keep casual visitors out, not withstand a determined
+ *      attacker. The list of shopping locations (name + emoji) is
+ *      still admin-only to edit, via requireAdmin() as usual.
  *
  * ONE MORE STEP ON THE BACK4APP DASHBOARD:
- *   Set InventoryItem, Recipe, and StorageLayout's Class-Level
- *   Permissions to "Public Read" and NO public write/update/delete.
- *   That way even if someone got hold of your App ID/JS Key (which are
- *   meant to be public), they still can't write directly through the
- *   client SDK — every write has to go through these Cloud Functions,
- *   which check the admin session.
+ *   Set InventoryItem, Recipe, StorageLayout, GroceryItem, and
+ *   GroceryLocation's Class-Level Permissions to "Public Read" and NO
+ *   public write/update/delete. That way even if someone got hold of
+ *   your App ID/JS Key (which are meant to be public), they still can't
+ *   write directly through the client SDK — every write has to go
+ *   through these Cloud Functions, which check the admin session or
+ *   grocery PIN session as appropriate.
  * -----------------------------------------------------------------------
  */
 
@@ -39,10 +49,16 @@ const ADMIN_USERNAME = "zeebug";
 const ADMIN_PASSWORD = "oatmeal";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 12; // 12 hours
 
+const GROCERY_PIN = "1234"; // change this to whatever you want people to enter
+const GROCERY_SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days — low-stakes, meant to stay unlocked on your phone
+
 const AdminSession = Parse.Object.extend("AdminSession");
 const InventoryItem = Parse.Object.extend("InventoryItem");
 const Recipe = Parse.Object.extend("Recipe");
 const StorageLayout = Parse.Object.extend("StorageLayout");
+const GrocerySession = Parse.Object.extend("GrocerySession");
+const GroceryItem = Parse.Object.extend("GroceryItem");
+const GroceryLocation = Parse.Object.extend("GroceryLocation");
 
 Parse.Cloud.define("adminLogin", async (request) => {
   const { username, password } = request.params;
@@ -196,4 +212,110 @@ Parse.Cloud.define("adminSaveStorageLayout", async (request) => {
   layout.set("zones", Array.isArray(zones) ? zones : []);
   await layout.save(null, { useMasterKey: true });
   return layout.toJSON();
+});
+
+/* ============================================================
+   Grocery list — PIN-gated, separate from admin login
+   ============================================================ */
+
+Parse.Cloud.define("groceryLogin", async (request) => {
+  const { pin } = request.params;
+  if (pin !== GROCERY_PIN) {
+    throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, "Incorrect PIN.");
+  }
+  const token = "grocery-" + Date.now() + "-" + Math.random().toString(36).slice(2, 10);
+  const session = new GrocerySession();
+  session.set("token", token);
+  session.set("expiresAt", new Date(Date.now() + GROCERY_SESSION_TTL_MS));
+  await session.save(null, { useMasterKey: true });
+  return { token };
+});
+
+/**
+ * Throws unless `groceryToken` matches a real, unexpired GrocerySession.
+ * Deliberately separate from requireAdmin() — this is a much lower bar
+ * (a shared 4-digit PIN, not a username/password), on purpose, so it's
+ * easy to hand to someone else without giving them full admin access.
+ */
+async function requireGroceryAccess(groceryToken) {
+  if (!groceryToken) {
+    throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, "Missing grocery access token.");
+  }
+  const query = new Parse.Query(GrocerySession);
+  query.equalTo("token", groceryToken);
+  const session = await query.first({ useMasterKey: true });
+  if (!session) {
+    throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, "Invalid grocery session.");
+  }
+  if (session.get("expiresAt") < new Date()) {
+    await session.destroy({ useMasterKey: true });
+    throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, "Grocery session expired. Please enter the PIN again.");
+  }
+  return session;
+}
+
+const GROCERY_ITEM_FIELDS = ["name", "category", "location", "bulk"];
+
+function applyGroceryItemFields(item, params) {
+  GROCERY_ITEM_FIELDS.forEach((field) => {
+    if (params[field] !== undefined) item.set(field, params[field]);
+  });
+}
+
+Parse.Cloud.define("groceryCreateItem", async (request) => {
+  await requireGroceryAccess(request.params.groceryToken);
+  const item = new GroceryItem();
+  applyGroceryItemFields(item, request.params);
+  await item.save(null, { useMasterKey: true });
+  return item.toJSON();
+});
+
+Parse.Cloud.define("groceryUpdateItem", async (request) => {
+  await requireGroceryAccess(request.params.groceryToken);
+  const query = new Parse.Query(GroceryItem);
+  const item = await query.get(request.params.id, { useMasterKey: true });
+  applyGroceryItemFields(item, request.params);
+  await item.save(null, { useMasterKey: true });
+  return item.toJSON();
+});
+
+Parse.Cloud.define("groceryDeleteItem", async (request) => {
+  await requireGroceryAccess(request.params.groceryToken);
+  const query = new Parse.Query(GroceryItem);
+  const item = await query.get(request.params.id, { useMasterKey: true });
+  await item.destroy({ useMasterKey: true });
+  return { success: true };
+});
+
+/**
+ * Shopping locations (name + emoji, e.g. "🥕 Sac Central Farmers Market")
+ * are admin-managed, NOT grocery-PIN managed — set up once in
+ * Admin → Groceries, then everyone with the grocery PIN just picks from
+ * the list. Upserts by id: pass no id to create, an id to edit.
+ * `hasBulkBins` marks a location as having a bulk-bin section, which is
+ * what lets the "Bulk section" checkbox show up when adding an item
+ * tagged to that location.
+ */
+Parse.Cloud.define("adminSaveGroceryLocation", async (request) => {
+  await requireAdmin(request.params.adminToken);
+  const { id, name, emoji, hasBulkBins } = request.params;
+  let location;
+  if (id) {
+    location = await new Parse.Query(GroceryLocation).get(id, { useMasterKey: true });
+  } else {
+    location = new GroceryLocation();
+  }
+  if (name !== undefined) location.set("name", name);
+  if (emoji !== undefined) location.set("emoji", emoji);
+  if (hasBulkBins !== undefined) location.set("hasBulkBins", !!hasBulkBins);
+  await location.save(null, { useMasterKey: true });
+  return location.toJSON();
+});
+
+Parse.Cloud.define("adminDeleteGroceryLocation", async (request) => {
+  await requireAdmin(request.params.adminToken);
+  const query = new Parse.Query(GroceryLocation);
+  const location = await query.get(request.params.id, { useMasterKey: true });
+  await location.destroy({ useMasterKey: true });
+  return { success: true };
 });

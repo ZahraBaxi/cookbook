@@ -11,6 +11,7 @@ let allRecipes = [];
 let allInventoryItems = [];
 let activeFilter = "All";
 let activeType = "All";
+let activeReadiness = "All";
 let searchQuery = "";
 
 const Recipe = Parse.Object.extend("Recipe");
@@ -27,6 +28,7 @@ async function loadCookbookData() {
     allInventoryItems = items;
     renderFilterChips();
     renderTypeChips();
+    renderReadinessChips();
     renderRecipes();
   } catch (err) {
     console.error(err);
@@ -113,6 +115,33 @@ function recipeMatchesType(recipe) {
   return type.toLowerCase() === activeType.toLowerCase();
 }
 
+const READINESS_FILTERS = ["All", "Ready to Make", "Not Ready"];
+
+function renderReadinessChips() {
+  const row = document.getElementById("readiness-filter-row");
+  row.innerHTML = "";
+  READINESS_FILTERS.forEach((label) => {
+    const btn = document.createElement("button");
+    btn.className = "filter-chip";
+    btn.type = "button";
+    btn.textContent = label.toUpperCase();
+    btn.setAttribute("aria-pressed", String(label === activeReadiness));
+    btn.addEventListener("click", () => {
+      activeReadiness = label;
+      row.querySelectorAll(".filter-chip").forEach((c) => c.setAttribute("aria-pressed", "false"));
+      btn.setAttribute("aria-pressed", "true");
+      renderRecipes();
+    });
+    row.appendChild(btn);
+  });
+}
+
+function recipeMatchesReadiness(recipe) {
+  if (activeReadiness === "All") return true;
+  const ready = computeRecipeReadiness(recipe, allRecipes, allInventoryItems).ready;
+  return activeReadiness === "Ready to Make" ? ready : !ready;
+}
+
 function recipeMatchesSearch(recipe) {
   if (!searchQuery) return true;
   const q = searchQuery.toLowerCase();
@@ -130,7 +159,7 @@ function recipeMatchesSearch(recipe) {
 
 function renderRecipes() {
   const resultsEl = document.getElementById("recipe-results");
-  const filtered = allRecipes.filter((r) => recipeMatchesFilter(r) && recipeMatchesType(r) && recipeMatchesSearch(r));
+  const filtered = allRecipes.filter((r) => recipeMatchesFilter(r) && recipeMatchesType(r) && recipeMatchesReadiness(r) && recipeMatchesSearch(r));
 
   if (allRecipes.length === 0) {
     resultsEl.innerHTML = `<div class="empty-state"><p class="empty-state__title">No recipes yet.</p><p>Add your first one from the Admin page.</p></div>`;

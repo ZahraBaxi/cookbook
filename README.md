@@ -10,21 +10,24 @@ Static HTML/CSS/vanilla JS, backed by Back4App (Parse).
 ├── index.html              Landing page → links to Cookbook / Inventory
 ├── cookbook.html            Recipe browsing, search, filters, detail modal
 ├── inventory.html           Inventory catalog, summary strip, shelf views
-├── admin.html                Login + dashboard (inventory & recipe CRUD)
+├── admin.html                Login + dashboard (inventory, recipe, layout,
+│                              and grocery-location CRUD)
+├── groceries.html            PIN-gated shopping list (add items / check off)
 ├── css/
 │   └── styles.css            The entire design system (CSS variables at top)
 ├── js/
 │   ├── config.js              Back4App keys, site copy, controlled vocab — edit here
-│   ├── parse.js                Parse SDK init + admin session helpers
+│   ├── parse.js                Parse SDK init + admin & grocery session helpers
 │   ├── utils.js                 Ingredient matching, formatting, toasts, modals
 │   ├── cookbook.js              Cookbook page logic
 │   ├── inventory.js             Inventory page logic
 │   ├── admin.js                  Admin login + CRUD logic
+│   ├── groceries.js              Grocery list page logic (PIN gate + both views)
 │   ├── storage-layout.js         Doll-house grid: shared by Admin → Layout,
 │   │                              the item form's location/shelf picker,
 │   │                              and the Inventory mini-map
+│   ├── cloud-code-additions.js  Back4App Cloud Code to paste in (NOT part of the static site)
 │   └── seed.js                   Optional: sample data, run once from the console
-├── cloud-code-additions.js  Back4App Cloud Code to paste in (NOT part of the static site)
 └── README.md
 ```
 
@@ -70,12 +73,12 @@ check alone is not real security.
   writing to Parse directly, so the Master Key never leaves the server.
 
 **You still need to do one thing in the Back4App dashboard**: set
-`InventoryItem`, `Recipe`, and `StorageLayout`'s Class-Level Permissions to
-**Public Read**, with **no public write/update/delete**. That closes the
-last gap — right now, anyone with your App ID/JS Key could otherwise write
-to those classes directly through the client SDK, bypassing the site
-entirely. Cookbook and Inventory only ever read, so read access can safely
-stay public.
+`InventoryItem`, `Recipe`, `StorageLayout`, `GroceryItem`, and
+`GroceryLocation`'s Class-Level Permissions to **Public Read**, with **no
+public write/update/delete**. That closes the last gap — right now, anyone
+with your App ID/JS Key could otherwise write to those classes directly
+through the client SDK, bypassing the site entirely. Cookbook, Inventory,
+and Groceries only ever read, so read access can safely stay public.
 
 Do not deploy this as "secure" without applying `cloud-code-additions.js`
 and locking down those permissions — as shipped, the original `adminLogin`
@@ -150,6 +153,29 @@ username    String
 expiresAt   Date
 ```
 
+**GroceryLocation** (managed in Admin → Groceries — the places you shop)
+```
+name          String   (e.g. "Sac Central Farmers Market")
+emoji         String   (e.g. "🥕")
+hasBulkBins   Boolean  (shows a "bulk section" checkbox on items added for this location)
+```
+
+**GroceryItem** (added/edited/removed from groceries.html)
+```
+name        String
+category    String   (reuses the same categories as InventoryItem)
+location    String   (a GroceryLocation's name, or blank for "no specific store")
+bulk        Boolean  (this item is in that location's bulk bin section)
+```
+
+**GrocerySession** (created automatically the first time `groceryLogin`
+runs — same idea as AdminSession, but for the grocery PIN, not the admin
+password)
+```
+token       String
+expiresAt   Date
+```
+
 Back4App auto-creates classes and columns the first time data is saved with
 the Master Key, so once `cloud-code-additions.js` is deployed and you save
 your first item through the Admin page, the schema appears on its own — no
@@ -212,6 +238,48 @@ can write them, via `adminSaveStorageLayout`.
 A location with no zones yet just doesn't show a mini-map on Inventory
 and offers only "no specific shelf" in the item-form picker — nothing
 breaks, it just isn't subdivided until you draw something.
+
+## Grocery list (groceries.html)
+
+The list itself is visible to EVERYONE who opens the page — no PIN
+needed. That's deliberate: send a family member the link and they can see
+exactly what to pick up without you having to share any credentials. The
+PIN only gates *adding, editing, or checking off* items, via a small
+"🔓 Unlock to edit" toggle that reveals an inline PIN field. It's a much
+lighter 4-digit gate (hardcoded as `"1234"` in Cloud Code — see
+`GROCERY_PIN` in `cloud-code-additions.js`, change it to whatever you
+want) than the admin username/password, on purpose, so it's easy to hand
+off without giving out full admin access. Entering the PIN saves a token
+to `localStorage` (not `sessionStorage`, unlike admin) so it stays
+unlocked across app restarts on a phone — reasonable for a shopping list,
+which isn't sensitive data.
+
+Once unlocked, two views on the same `GroceryItem` list:
+
+- **Add to list** — a small form (item name, category, which store to get
+  it from, and a "bulk bin section" checkbox that only appears for stores
+  marked as having one) plus everything currently on the list, grouped by
+  store, each with Edit and Remove buttons. Edit reuses the same form —
+  it fills in that item's current values and switches to "Save Changes."
+- **Check off** — filter chips for each store you've shopped at, then a
+  checklist grouped by category. Checking a box removes the item from the
+  list — same action as Remove, just framed for "I got this" instead of
+  "never mind."
+
+**Shopping locations** (name + emoji + whether they have a bulk bin
+section, e.g. "🥕 Sac Central Farmers Market") are managed separately, in
+Admin → Groceries, under your normal admin login — so setting up *where*
+you shop (and which of those places have bulk bins) is an admin task,
+while day-to-day list-building/checking-off only needs the PIN.
+**Categories** reuse the exact same list as InventoryItem (Produce,
+Dairy, Protein, Grains, etc.) rather than a separate config, so the two
+stay consistent.
+
+Like the housewarming site's shared password, the PIN is meant to keep
+casual visitors from editing the list, not to withstand a determined
+attacker — `GroceryItem`/`GroceryLocation` are Public Read like everything
+else here, which is exactly what makes the no-PIN read-only view possible
+in the first place.
 
 ## How recipe-to-inventory matching works
 

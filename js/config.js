@@ -14,15 +14,19 @@ const CONFIG = {
   PARSE_SERVER_URL: "https://parseapi.back4app.com/",
 
   // Site copy — change wording here and it updates everywhere.
-  SITE_TITLE: "THE KITCHEN",
+  SITE_TITLE: "Zahra's Kitchen",
+  HOME_SUBTITLE: "My digital inventory and lists for my kitchen. Add to the buttons, see grocery list.",
   COOKBOOK_SUBTITLE: "Recipes from my kitchen.",
   INVENTORY_SUBTITLE: "What's in the kitchen.",
+  MAIN_SITE_URL: "https://zahrabaxi.com",
+  MAIN_SITE_LABEL: "zahrabaxi.com",
 
   // sessionStorage key used to hold the admin session token.
   // The token proves a successful adminLogin call; it is not a secret
   // credential itself, but it is still scoped to the browser session.
   ADMIN_TOKEN_KEY: "kitchen_admin_token",
   ADMIN_USER_KEY: "kitchen_admin_user",
+  GROCERY_TOKEN_KEY: "kitchen_grocery_token",
 
   // Controlled vocabulary. Recipes can still use free-form categories/tags —
   // this list only drives the Inventory admin dropdowns and filter chips.

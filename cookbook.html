@@ -19,6 +19,7 @@
     <ul class="nav-links">
       <li><a href="cookbook.html" aria-current="page">COOKBOOK</a></li>
       <li><a href="inventory.html">INVENTORY</a></li>
+      <li><a href="groceries.html">GROCERIES</a></li>
       <li><a href="admin.html">ADMIN</a></li>
     </ul>
   </nav>
@@ -43,6 +44,10 @@
       <div class="toolbar__label">TYPE</div>
       <div class="filter-row" id="type-filter-row" role="group" aria-label="Filter recipes by type"></div>
     </div>
+    <div class="toolbar toolbar--secondary">
+      <div class="toolbar__label">SHOW</div>
+      <div class="filter-row" id="readiness-filter-row" role="group" aria-label="Filter recipes by whether you can make them right now"></div>
+    </div>
 
     <div id="recipe-results" aria-live="polite">
       <div class="loading-row">Loading recipes from back4app…</div>
@@ -51,7 +56,7 @@
 </main>
 
 <footer class="site-footer">
-  <div class="shell">A personal kitchen archive.</div>
+  <div class="shell" data-site-footer>Zahra's Kitchen.</div>
 </footer>
 
 <!-- Recipe detail modal -->

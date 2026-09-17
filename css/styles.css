@@ -243,6 +243,22 @@ main { min-height: 60vh; }
   gap: 0.9rem;
 }
 
+.grocery-pin-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin: 1rem 0 1.5rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-section-bg);
+}
+
+.grocery-pin-inline .admin-error {
+  flex: 1 1 100%;
+  margin: 0;
+}
+
 .toolbar__label {
   font-size: var(--step-caption);
   letter-spacing: 0.1em;
@@ -791,6 +807,30 @@ main { min-height: 60vh; }
   border-bottom: 1px solid var(--color-border-strong);
   background: var(--color-section-bg);
 }
+
+.admin-missing-section__header {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--color-border-strong);
+  background: var(--color-section-bg);
+}
+
+.admin-missing-section__header .admin-missing-section__title {
+  border-bottom: none;
+  flex: 1 1 auto;
+}
+
+.admin-missing-section__toggle {
+  padding: 0.9rem 1.25rem;
+  font-size: var(--step-caption);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  flex: 0 0 auto;
+}
+
+.admin-missing-section__toggle:hover { color: var(--color-text); }
 
 .missing-ingredient-row {
   display: flex;

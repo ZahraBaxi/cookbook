@@ -494,6 +494,12 @@ function initNavToggle() {
 function applySiteCopy() {
   document.querySelectorAll("[data-site-title]").forEach((el) => (el.textContent = CONFIG.SITE_TITLE));
   document.title = document.title.replace("THE KITCHEN", CONFIG.SITE_TITLE);
+
+  document.querySelectorAll("[data-home-subtitle]").forEach((el) => (el.textContent = CONFIG.HOME_SUBTITLE));
+
+  document.querySelectorAll("[data-site-footer]").forEach((el) => {
+    el.innerHTML = `${escapeHtml(CONFIG.SITE_TITLE)}. &copy; 2026, made with &lt;3 by zahra using html, css, js, and sparkle dust. A project within <a href="${CONFIG.MAIN_SITE_URL}" target="_blank" rel="noopener">${escapeHtml(CONFIG.MAIN_SITE_LABEL)}</a>.`;
+  });
 }
 
 document.addEventListener("DOMContentLoaded", () => {

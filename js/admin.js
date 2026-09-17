@@ -10,6 +10,7 @@
 
 const InventoryItemClass = Parse.Object.extend("InventoryItem");
 const RecipeClass = Parse.Object.extend("Recipe");
+const GroceryLocationClass = Parse.Object.extend("GroceryLocation");
 
 let adminInventoryItems = [];
 let adminRecipes = [];
@@ -21,6 +22,63 @@ let currentSimilarTagGroups = [];
 let currentSimilarInventoryGroups = [];
 let storageLayouts = {}; // location -> { objectId, rows, cols, zones } — see storage-layout.js
 let zoneModalContext = null; // { location, zone|null, rect|null, onSaved } — see storage-layout.js
+let groceryLocations = []; // GroceryLocation records (name + emoji) — managed here, used by groceries.html
+let editingGroceryLocationId = null;
+
+/* ---------------------------------------------------------------------
+ * Admin UI preferences — purely local (localStorage), not synced to
+ * Parse. Remembers which "Needed for Recipes"/"Similar Inventory Items"
+ * sections you've collapsed, and which specific rows you've dismissed
+ * with "IGNORE" (a false positive that isn't actually missing/a
+ * duplicate), so the noise doesn't come back every reload.
+ * ------------------------------------------------------------------- */
+
+const ADMIN_UI_PREFS_KEY = "kitchen_admin_ui_prefs";
+
+function loadAdminUiPrefs() {
+  let prefs = {};
+  try {
+    prefs = JSON.parse(localStorage.getItem(ADMIN_UI_PREFS_KEY)) || {};
+  } catch (err) {
+    prefs = {};
+  }
+  prefs.collapsed = prefs.collapsed || {};
+  prefs.ignoredMissing = prefs.ignoredMissing || [];
+  prefs.ignoredSimilarInventory = prefs.ignoredSimilarInventory || [];
+  return prefs;
+}
+
+function saveAdminUiPrefs() {
+  localStorage.setItem(ADMIN_UI_PREFS_KEY, JSON.stringify(adminUiPrefs));
+}
+
+let adminUiPrefs = loadAdminUiPrefs();
+
+/**
+ * Wires a section's collapse/expand toggle button and remembers the
+ * choice under `prefKey`. Call once per section at setup time; render
+ * functions should call applyCollapsedState(prefKey) again after
+ * re-rendering the section's body (e.g. after a data reload), since
+ * that replaces the body's `hidden` state along with its content.
+ */
+function setupCollapsibleSection(prefKey, toggleBtnId) {
+  const toggleBtn = document.getElementById(toggleBtnId);
+  toggleBtn.addEventListener("click", () => {
+    adminUiPrefs.collapsed[prefKey] = !adminUiPrefs.collapsed[prefKey];
+    saveAdminUiPrefs();
+    applyCollapsedState(prefKey, toggleBtnId);
+  });
+  applyCollapsedState(prefKey, toggleBtnId);
+}
+
+function applyCollapsedState(prefKey, toggleBtnId) {
+  const toggleBtn = document.getElementById(toggleBtnId);
+  const bodyEl = toggleBtn.closest(".admin-missing-section").querySelector(":scope > :not(.admin-missing-section__header)");
+  const collapsed = !!adminUiPrefs.collapsed[prefKey];
+  bodyEl.hidden = collapsed;
+  toggleBtn.textContent = collapsed ? "SHOW" : "HIDE";
+  toggleBtn.setAttribute("aria-expanded", String(!collapsed));
+}
 
 /* ---------------------------------------------------------------------
  * Login
@@ -82,6 +140,7 @@ function initTabs() {
     inventory: { tab: document.getElementById("tab-inventory"), panel: document.getElementById("panel-inventory") },
     recipes: { tab: document.getElementById("tab-recipes"), panel: document.getElementById("panel-recipes") },
     layout: { tab: document.getElementById("tab-layout"), panel: document.getElementById("panel-layout") },
+    groceries: { tab: document.getElementById("tab-groceries"), panel: document.getElementById("panel-groceries") },
   };
 
   function activate(name) {
@@ -91,11 +150,13 @@ function initTabs() {
       panel.hidden = !active;
     });
     if (name === "layout") activateLayoutTab();
+    if (name === "groceries") loadGroceryLocations();
   }
 
   tabs.inventory.tab.addEventListener("click", () => activate("inventory"));
   tabs.recipes.tab.addEventListener("click", () => activate("recipes"));
   tabs.layout.tab.addEventListener("click", () => activate("layout"));
+  tabs.groceries.tab.addEventListener("click", () => activate("groceries"));
 }
 
 /* ---------------------------------------------------------------------
@@ -219,11 +280,24 @@ function computeSimilarInventoryGroups() {
     .sort((a, b) => (inventoryItemLabel(a.canonical) || "").localeCompare(inventoryItemLabel(b.canonical) || ""));
 }
 
+/**
+ * A stable identifier for a similar-inventory group, used to remember an
+ * "IGNORE" dismissal across reloads/re-renders. Based on the actual
+ * item ids involved (sorted so order doesn't matter), not the names —
+ * names can change on edit, but this pairing of specific items is what
+ * the person is actually saying "not a duplicate" about.
+ */
+function similarInventoryGroupKey(group) {
+  return [group.canonical.id, ...group.duplicates.map((d) => d.id)].sort().join("|");
+}
+
 function renderSimilarInventory() {
   const container = document.getElementById("similar-inventory-list");
   if (!container) return;
 
-  currentSimilarInventoryGroups = computeSimilarInventoryGroups();
+  currentSimilarInventoryGroups = computeSimilarInventoryGroups().filter(
+    (g) => !adminUiPrefs.ignoredSimilarInventory.includes(similarInventoryGroupKey(g))
+  );
   if (currentSimilarInventoryGroups.length === 0) {
     container.innerHTML = `<p class="admin-missing-empty">No similar inventory items found.</p>`;
     return;
@@ -242,7 +316,10 @@ function renderSimilarInventory() {
           <div class="missing-ingredient-row__name">${escapeHtml(inventoryItemLabel(g.canonical))}${tag ? ` <span class="missing-ingredient-row__tag">${tag}</span>` : ""}</div>
           <div class="missing-ingredient-row__recipes">${escapeHtml(detail)}</div>
         </div>
-        <button type="button" class="btn btn--small btn--primary" data-merge-inventory-group="${idx}">MERGE</button>
+        <div style="display:flex; gap:0.5rem;">
+          <button type="button" class="btn btn--ghost btn--small" data-ignore-inventory-group="${idx}">IGNORE</button>
+          <button type="button" class="btn btn--small btn--primary" data-merge-inventory-group="${idx}">MERGE</button>
+        </div>
       </div>`;
     })
     .join("");
@@ -251,6 +328,17 @@ function renderSimilarInventory() {
     btn.addEventListener("click", () => {
       const idx = parseInt(btn.getAttribute("data-merge-inventory-group"), 10);
       confirmMergeInventoryGroup(currentSimilarInventoryGroups[idx]);
+    });
+  });
+
+  container.querySelectorAll("[data-ignore-inventory-group]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const idx = parseInt(btn.getAttribute("data-ignore-inventory-group"), 10);
+      const key = similarInventoryGroupKey(currentSimilarInventoryGroups[idx]);
+      adminUiPrefs.ignoredSimilarInventory.push(key);
+      saveAdminUiPrefs();
+      showToast("Dismissed — won't show this pairing again.");
+      renderSimilarInventory();
     });
   });
 }
@@ -285,7 +373,7 @@ function confirmMergeInventoryGroup(group) {
  * ------------------------------------------------------------------- */
 
 function computeMissingIngredients() {
-  const missingMap = new Map(); // normalized name -> { name, recipes: Set, requiredSomewhere: boolean }
+  const missingMap = new Map(); // normalized name -> { key, name, recipes: Set, requiredSomewhere: boolean }
   adminRecipes.forEach((recipe) => {
     (recipe.get("ingredients") || []).forEach((ing) => {
       if (!ing.name) return;
@@ -294,7 +382,7 @@ function computeMissingIngredients() {
       const key = normalizeText(ing.name);
       if (!key) return;
       if (!missingMap.has(key)) {
-        missingMap.set(key, { name: ing.name, recipes: new Set(), requiredSomewhere: false });
+        missingMap.set(key, { key, name: ing.name, recipes: new Set(), requiredSomewhere: false });
       }
       const entry = missingMap.get(key);
       entry.recipes.add(recipe.get("title"));
@@ -313,7 +401,7 @@ function renderMissingIngredients() {
     return;
   }
 
-  const missing = computeMissingIngredients();
+  const missing = computeMissingIngredients().filter((entry) => !adminUiPrefs.ignoredMissing.includes(entry.key));
   if (missing.length === 0) {
     container.innerHTML = `<p class="admin-missing-empty">Every recipe ingredient is covered by your current inventory.</p>`;
     return;
@@ -329,13 +417,25 @@ function renderMissingIngredients() {
           <div class="missing-ingredient-row__name">${escapeHtml(titleCase(entry.name))}${entry.requiredSomewhere ? "" : ' <span class="missing-ingredient-row__tag">optional</span>'}</div>
           <div class="missing-ingredient-row__recipes">${escapeHtml(Array.from(entry.recipes).join(", "))}</div>
         </div>
-        <button type="button" class="btn btn--small btn--primary" data-add-missing="${escapeHtml(addName)}">+ ADD</button>
+        <div style="display:flex; gap:0.5rem;">
+          <button type="button" class="btn btn--ghost btn--small" data-ignore-missing="${escapeHtml(entry.key)}">IGNORE</button>
+          <button type="button" class="btn btn--small btn--primary" data-add-missing="${escapeHtml(addName)}">+ ADD</button>
+        </div>
       </div>`;
     })
     .join("");
 
   container.querySelectorAll("[data-add-missing]").forEach((btn) => {
     btn.addEventListener("click", () => openItemForm(null, btn.getAttribute("data-add-missing")));
+  });
+
+  container.querySelectorAll("[data-ignore-missing]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      adminUiPrefs.ignoredMissing.push(btn.getAttribute("data-ignore-missing"));
+      saveAdminUiPrefs();
+      showToast("Dismissed — won't show this one again.");
+      renderMissingIngredients();
+    });
   });
 }
 
@@ -1068,6 +1168,104 @@ function handleRecipeDeleteClick() {
 }
 
 /* ---------------------------------------------------------------------
+ * Grocery shopping locations (Admin → Groceries) — the emoji-tagged
+ * places you shop, e.g. "🥕 Sac Central Farmers Market". Managed here
+ * under full admin login; the actual shopping list (add items, check
+ * off) lives on the separate, PIN-gated groceries.html.
+ * ------------------------------------------------------------------- */
+
+async function loadGroceryLocations() {
+  const listEl = document.getElementById("grocery-locations-list");
+  listEl.innerHTML = `<div class="loading-row">Loading…</div>`;
+  try {
+    groceryLocations = await new Parse.Query(GroceryLocationClass).ascending("name").limit(200).find();
+    renderGroceryLocationsList();
+  } catch (err) {
+    console.error(err);
+    listEl.innerHTML = `<div class="empty-state"><p class="empty-state__title">Couldn't load locations.</p></div>`;
+  }
+}
+
+function renderGroceryLocationsList() {
+  const listEl = document.getElementById("grocery-locations-list");
+  if (groceryLocations.length === 0) {
+    listEl.innerHTML = `<p class="admin-missing-empty">No locations yet — add the places you shop.</p>`;
+    return;
+  }
+
+  listEl.innerHTML = groceryLocations
+    .map(
+      (loc) => `
+      <div class="missing-ingredient-row">
+        <div>
+          <div class="missing-ingredient-row__name">${escapeHtml(loc.get("emoji") || "")} ${escapeHtml(loc.get("name") || "")}</div>
+          ${loc.get("hasBulkBins") ? `<div class="missing-ingredient-row__recipes">Has a bulk bin section</div>` : ""}
+        </div>
+        <button type="button" class="btn btn--ghost btn--small" data-edit-grocery-location="${loc.id}">EDIT</button>
+      </div>`
+    )
+    .join("");
+
+  listEl.querySelectorAll("[data-edit-grocery-location]").forEach((btn) => {
+    btn.addEventListener("click", () => openGroceryLocationModal(btn.getAttribute("data-edit-grocery-location")));
+  });
+}
+
+function openGroceryLocationModal(locationId) {
+  editingGroceryLocationId = locationId || null;
+  const location = locationId ? groceryLocations.find((l) => l.id === locationId) : null;
+
+  document.getElementById("grocery-location-modal-title").textContent = location ? "Edit location" : "New location";
+  document.getElementById("grocery-location-emoji").value = location ? location.get("emoji") || "" : "";
+  document.getElementById("grocery-location-name").value = location ? location.get("name") || "" : "";
+  document.getElementById("grocery-location-bulk").checked = location ? !!location.get("hasBulkBins") : false;
+  document.getElementById("grocery-location-delete-btn").hidden = !location;
+
+  openModal(document.getElementById("grocery-location-modal-overlay"));
+}
+
+async function handleGroceryLocationFormSubmit(e) {
+  e.preventDefault();
+  const name = document.getElementById("grocery-location-name").value.trim();
+  if (!name) return;
+  const emoji = document.getElementById("grocery-location-emoji").value.trim();
+  const hasBulkBins = document.getElementById("grocery-location-bulk").checked;
+
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+  submitBtn.textContent = "SAVING…";
+  try {
+    await runAdminCloud("adminSaveGroceryLocation", { id: editingGroceryLocationId, name, emoji, hasBulkBins });
+    closeModal(document.getElementById("grocery-location-modal-overlay"));
+    showToast("Location saved.");
+    await loadGroceryLocations();
+  } catch (err) {
+    console.error(err);
+    showToast(err.message || "Couldn't save location.", "error");
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = "SAVE";
+  }
+}
+
+function handleGroceryLocationDeleteClick() {
+  if (!editingGroceryLocationId) return;
+  const id = editingGroceryLocationId;
+  const location = groceryLocations.find((l) => l.id === id);
+  openConfirmModal(
+    "Delete this location?",
+    `"${location ? location.get("name") : "This location"}" will no longer show up as an option on the grocery list. Items already added under it keep their text label but won't be grouped under it anymore.`,
+    "DELETE",
+    async () => {
+      await runAdminCloud("adminDeleteGroceryLocation", { id });
+      showToast("Location deleted.");
+      closeModal(document.getElementById("grocery-location-modal-overlay"));
+      await loadGroceryLocations();
+    }
+  );
+}
+
+/* ---------------------------------------------------------------------
  * Shared confirm modal — used for deletes and for merges. Whatever
  * opened it sets pendingConfirmAction; the confirm button just runs it.
  * ------------------------------------------------------------------- */
@@ -1125,6 +1323,16 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("zone-cancel-btn").addEventListener("click", () => closeModal(document.getElementById("zone-modal-overlay")));
   document.getElementById("zone-modal-close").addEventListener("click", () => closeModal(document.getElementById("zone-modal-overlay")));
   document.getElementById("zone-delete-btn").addEventListener("click", handleZoneDeleteClick);
+
+  // Groceries (locations only — the shopping list itself is on groceries.html)
+  document.getElementById("add-grocery-location-btn").addEventListener("click", () => openGroceryLocationModal(null));
+  document.getElementById("grocery-location-form").addEventListener("submit", handleGroceryLocationFormSubmit);
+  document.getElementById("grocery-location-cancel-btn").addEventListener("click", () => closeModal(document.getElementById("grocery-location-modal-overlay")));
+  document.getElementById("grocery-location-modal-close").addEventListener("click", () => closeModal(document.getElementById("grocery-location-modal-overlay")));
+  document.getElementById("grocery-location-delete-btn").addEventListener("click", handleGroceryLocationDeleteClick);
+
+  setupCollapsibleSection("missingIngredients", "toggle-missing-ingredients");
+  setupCollapsibleSection("similarInventory", "toggle-similar-inventory");
 
   // Recipes
   document.getElementById("add-recipe-btn").addEventListener("click", () => openRecipeForm(null));
