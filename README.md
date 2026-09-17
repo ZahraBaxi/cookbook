@@ -166,6 +166,9 @@ name        String
 category    String   (reuses the same categories as InventoryItem)
 location    String   (a GroceryLocation's name, or blank for "no specific store")
 bulk        Boolean  (this item is in that location's bulk bin section)
+status      String   ("list" — still need it — or "checkedOut" — bought,
+                      not yet put away. Missing/undefined counts as "list"
+                      for older records saved before this field existed.)
 ```
 
 **GrocerySession** (created automatically the first time `groceryLogin`
@@ -254,24 +257,39 @@ to `localStorage` (not `sessionStorage`, unlike admin) so it stays
 unlocked across app restarts on a phone — reasonable for a shopping list,
 which isn't sensitive data.
 
-Once unlocked, two views on the same `GroceryItem` list:
+Once unlocked, three tabs on the same `GroceryItem` list:
 
-- **Add to list** — a small form (item name, category, which store to get
-  it from, and a "bulk bin section" checkbox that only appears for stores
-  marked as having one) plus everything currently on the list, grouped by
-  store, each with Edit and Remove buttons. Edit reuses the same form —
-  it fills in that item's current values and switches to "Save Changes."
+- **Add to list** — a "low stock — need to buy?" panel up top surfaces
+  any Inventory item at a low level (same `CONFIG.LOW_LEVELS` used for the
+  low-stock badge on Inventory), each with a one-tap "+ Add to List"
+  button and a "Finished" button that deletes it from Inventory outright
+  (for when it's fully used up, not just running low). That panel
+  remembers whether you've collapsed it (localStorage). Below that, the
+  usual add form (item name, category, which store to get it from, and a
+  "bulk bin section" checkbox that only appears for stores marked as
+  having one) plus everything currently on the list, grouped by store,
+  each with Edit and Remove buttons. Edit reuses the same form — it fills
+  in that item's current values and switches to "Save Changes." Remove
+  deletes the item outright (different from checking it off — see below).
 - **Check off** — filter chips for each store you've shopped at, then a
-  checklist grouped by category. Checking a box removes the item from the
-  list — same action as Remove, just framed for "I got this" instead of
-  "never mind."
+  checklist grouped by category. Checking a box does NOT delete the item —
+  it moves it to the Checkout tab (`status: "checkedOut"`), since you've
+  bought it but haven't put it away yet.
+- **Checkout** — everything you've bought but not yet put away. "Put
+  away" opens the exact same kind of form as adding an item in
+  Admin → Inventory: name/type, category, the visual location/shelf
+  picker (same doll-house component as Admin → Layout), quantity, unit,
+  level, expiration date, and notes. Submitting creates the real
+  `InventoryItem` and removes the grocery entry for good — one call
+  (`groceryCheckoutToInventory`) does both. "↩ Back to list" undoes an
+  accidental check-off.
 
 **Shopping locations** (name + emoji + whether they have a bulk bin
 section, e.g. "🥕 Sac Central Farmers Market") are managed separately, in
 Admin → Groceries, under your normal admin login — so setting up *where*
 you shop (and which of those places have bulk bins) is an admin task,
-while day-to-day list-building/checking-off only needs the PIN.
-**Categories** reuse the exact same list as InventoryItem (Produce,
+while day-to-day list-building/checking-off/putting-away only needs the
+PIN. **Categories** reuse the exact same list as InventoryItem (Produce,
 Dairy, Protein, Grains, etc.) rather than a separate config, so the two
 stay consistent.
 
@@ -280,6 +298,16 @@ casual visitors from editing the list, not to withstand a determined
 attacker — `GroceryItem`/`GroceryLocation` are Public Read like everything
 else here, which is exactly what makes the no-PIN read-only view possible
 in the first place.
+
+**Worth knowing**: putting an item away and marking a low-stock item
+"finished" both touch `InventoryItem` (`groceryCheckoutToInventory` and
+`groceryDeleteInventoryItem`), gated by the grocery PIN rather than full
+admin login. That's a deliberate trade-off — the everyday "I'm putting
+groceries away" task shouldn't require a separate admin session — but it
+does mean anyone with the grocery PIN can create or delete Inventory
+records this way, not just manage the grocery list. If that's more access
+than you want to hand out with the PIN, the fix is to require the admin
+login for those two actions instead — say so and I can change it.
 
 ## How recipe-to-inventory matching works
 

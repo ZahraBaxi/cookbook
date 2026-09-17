@@ -15,11 +15,10 @@ const CONFIG = {
 
   // Site copy — change wording here and it updates everywhere.
   SITE_TITLE: "Zahra's Kitchen",
-  HOME_SUBTITLE: "My digital inventory and lists for my kitchen. Add to the buttons, see grocery list.",
+  HOME_SUBTITLE: "My digital inventory and lists for my kitchen.",
   COOKBOOK_SUBTITLE: "Recipes from my kitchen.",
   INVENTORY_SUBTITLE: "What's in the kitchen.",
   MAIN_SITE_URL: "https://zahrabaxi.com",
-  MAIN_SITE_LABEL: "zahrabaxi.com",
 
   // sessionStorage key used to hold the admin session token.
   // The token proves a successful adminLogin call; it is not a secret

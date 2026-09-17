@@ -63,10 +63,21 @@
       <div class="admin-tabs" role="tablist" style="margin-bottom:1.5rem;">
         <button class="admin-tab" role="tab" id="tab-grocery-add" aria-selected="true" aria-controls="panel-grocery-add">ADD TO LIST</button>
         <button class="admin-tab" role="tab" id="tab-grocery-check" aria-selected="false" aria-controls="panel-grocery-check">CHECK OFF</button>
+        <button class="admin-tab" role="tab" id="tab-grocery-checkout" aria-selected="false" aria-controls="panel-grocery-checkout">CHECKOUT</button>
       </div>
 
       <!-- Add to list -->
       <div id="panel-grocery-add" role="tabpanel" aria-labelledby="tab-grocery-add">
+        <div class="admin-missing-section" id="low-stock-section">
+          <div class="admin-missing-section__header">
+            <div class="admin-missing-section__title">LOW STOCK — NEED TO BUY?</div>
+            <button type="button" class="admin-missing-section__toggle" id="toggle-low-stock" aria-expanded="true">HIDE</button>
+          </div>
+          <div id="low-stock-list">
+            <div class="loading-row">Loading…</div>
+          </div>
+        </div>
+
         <form id="grocery-add-form" novalidate>
           <div class="form-grid">
             <div class="field field--full">
@@ -106,10 +117,92 @@
           <div class="loading-row">Loading…</div>
         </div>
       </div>
+
+      <!-- Checkout: bought but not yet put away -->
+      <div id="panel-grocery-checkout" role="tabpanel" aria-labelledby="tab-grocery-checkout" hidden>
+        <p class="admin-missing-empty" style="padding:1rem 0;">
+          Things you've bought but haven't put away yet. Tap "Put away" to log it into Inventory
+          with a location, shelf, quantity, and any other details — same as adding it from Admin.
+        </p>
+        <div id="grocery-checkout-list">
+          <div class="loading-row">Loading…</div>
+        </div>
+      </div>
     </div>
   </div>
 </main>
 
+<!-- Put-away modal: turns a checked-out grocery item into a real InventoryItem -->
+<div class="modal-overlay" id="putaway-modal-overlay" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="putaway-modal-title">
+    <button class="modal__close" id="putaway-modal-close" aria-label="Close">&times;</button>
+    <h2 id="putaway-modal-title">Put away</h2>
+    <form id="putaway-form" novalidate>
+      <div class="form-grid">
+        <div class="field field--full">
+          <label for="putaway-name">Name</label>
+          <input type="text" id="putaway-name" name="name" data-autofocus required />
+        </div>
+        <div class="field">
+          <label for="putaway-variant">Type <span style="color:var(--color-text-secondary); font-weight:400;">(optional)</span></label>
+          <input type="text" id="putaway-variant" name="variant" placeholder="e.g. Roma, Cherry, Heirloom" />
+        </div>
+        <div class="field">
+          <label for="putaway-category">Category</label>
+          <select id="putaway-category" name="category"></select>
+        </div>
+        <div class="field field--full">
+          <label>Where is it?</label>
+          <button type="button" class="location-picker-btn" id="putaway-location-picker-btn">
+            <span id="putaway-location-picker-label">Not set</span>
+            <span class="location-picker-btn__arrow">↳</span>
+          </button>
+          <input type="hidden" id="putaway-location" name="location" required />
+          <input type="hidden" id="putaway-shelf" name="shelf" />
+        </div>
+        <div class="field">
+          <label for="putaway-quantity">Quantity</label>
+          <input type="number" id="putaway-quantity" name="quantity" min="0" step="0.1" />
+        </div>
+        <div class="field">
+          <label for="putaway-unit">Unit</label>
+          <input type="text" id="putaway-unit" name="unit" placeholder="bottle, g, cup…" />
+        </div>
+        <div class="field">
+          <label for="putaway-expiration">Expiration date</label>
+          <input type="date" id="putaway-expiration" name="expirationDate" />
+        </div>
+        <div class="field field--full">
+          <label>Level</label>
+          <div class="level-selector" id="putaway-level-selector"></div>
+          <input type="hidden" id="putaway-level" name="level" value="Full" />
+        </div>
+        <div class="field field--full">
+          <label for="putaway-notes">Notes</label>
+          <textarea id="putaway-notes" name="notes" rows="3"></textarea>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn--primary">ADD TO INVENTORY</button>
+        <button type="button" class="btn btn--ghost" id="putaway-cancel-btn">CANCEL</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Location/shelf picker for the put-away modal (same doll-house component as Admin) -->
+<div class="modal-overlay" id="putaway-location-picker-modal-overlay" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="putaway-location-picker-modal-title">
+    <button class="modal__close" id="putaway-location-picker-modal-close" aria-label="Close">&times;</button>
+    <h2 id="putaway-location-picker-modal-title">Pick a spot</h2>
+    <div id="putaway-location-picker-breadcrumb"></div>
+    <div id="putaway-location-picker-dollhouse"></div>
+    <div id="putaway-location-picker-grid-wrap" hidden>
+      <div id="putaway-location-picker-grid"></div>
+      <button type="button" class="btn btn--ghost btn--small" id="putaway-location-picker-no-shelf-btn" style="margin-top:1rem;">USE THIS LOCATION, NO SPECIFIC SHELF</button>
+    </div>
+  </div>
+</div>
 <footer class="site-footer">
   <div class="shell" data-site-footer>Zahra's Kitchen.</div>
 </footer>
@@ -118,6 +211,7 @@
 <script src="js/config.js"></script>
 <script src="js/parse.js"></script>
 <script src="js/utils.js"></script>
+<script src="js/storage-layout.js"></script>
 <script src="js/groceries.js"></script>
 </body>
 </html>

@@ -254,7 +254,7 @@ async function requireGroceryAccess(groceryToken) {
   return session;
 }
 
-const GROCERY_ITEM_FIELDS = ["name", "category", "location", "bulk"];
+const GROCERY_ITEM_FIELDS = ["name", "category", "location", "bulk", "status"];
 
 function applyGroceryItemFields(item, params) {
   GROCERY_ITEM_FIELDS.forEach((field) => {
@@ -282,6 +282,50 @@ Parse.Cloud.define("groceryUpdateItem", async (request) => {
 Parse.Cloud.define("groceryDeleteItem", async (request) => {
   await requireGroceryAccess(request.params.groceryToken);
   const query = new Parse.Query(GroceryItem);
+  const item = await query.get(request.params.id, { useMasterKey: true });
+  await item.destroy({ useMasterKey: true });
+  return { success: true };
+});
+
+/**
+ * "Put away" a checked-out grocery item: creates the real InventoryItem
+ * with whatever details were filled in (location, shelf, quantity, unit,
+ * level, expiration, notes — the exact same fields as the admin item
+ * form), then removes it from the grocery list entirely since it's now
+ * fully migrated into Inventory. Deliberately gated by the grocery PIN,
+ * not full admin login — this is the everyday "I'm putting groceries
+ * away" action, and requiring a separate admin session for it would
+ * defeat the point of the lighter PIN. Worth knowing: this does mean
+ * anyone with the grocery PIN can create Inventory records this way, not
+ * just Grocery ones.
+ */
+Parse.Cloud.define("groceryCheckoutToInventory", async (request) => {
+  await requireGroceryAccess(request.params.groceryToken);
+  const { groceryItemId } = request.params;
+
+  const item = new InventoryItem();
+  applyInventoryFields(item, request.params);
+  await item.save(null, { useMasterKey: true });
+
+  if (groceryItemId) {
+    const groceryQuery = new Parse.Query(GroceryItem);
+    const groceryItem = await groceryQuery.get(groceryItemId, { useMasterKey: true });
+    await groceryItem.destroy({ useMasterKey: true });
+  }
+
+  return item.toJSON();
+});
+
+/**
+ * Lets the grocery-PIN-gated pages delete an InventoryItem directly —
+ * used for "mark this low-stock item as finished, take it off the shelf
+ * entirely" right from the grocery list, without needing a separate
+ * admin login. Same trade-off noted above: the grocery PIN can now touch
+ * Inventory too, not just the grocery list.
+ */
+Parse.Cloud.define("groceryDeleteInventoryItem", async (request) => {
+  await requireGroceryAccess(request.params.groceryToken);
+  const query = new Parse.Query(InventoryItem);
   const item = await query.get(request.params.id, { useMasterKey: true });
   await item.destroy({ useMasterKey: true });
   return { success: true };
