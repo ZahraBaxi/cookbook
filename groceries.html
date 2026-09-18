@@ -38,18 +38,6 @@
       </div>
     </div>
 
-    <!-- Inline PIN entry — hidden until "Unlock to edit" is clicked. Anyone can
-         see the list below without this; this only unlocks adding/editing. -->
-    <form id="grocery-pin-form" class="grocery-pin-inline" hidden novalidate>
-      <div class="field" style="max-width:140px;">
-        <label for="grocery-pin-input" class="visually-hidden">PIN</label>
-        <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" id="grocery-pin-input" autocomplete="off" placeholder="PIN" style="letter-spacing:0.4em; font-size:1.2rem; text-align:center;" />
-      </div>
-      <button type="submit" class="btn btn--primary btn--small">UNLOCK</button>
-      <button type="button" class="btn btn--ghost btn--small" id="grocery-pin-cancel-btn">CANCEL</button>
-      <p class="admin-error" id="grocery-pin-error" role="alert">Incorrect PIN.</p>
-    </form>
-
     <!-- Read-only view — visible to everyone, no PIN needed. What you'd send
          a family member so they can see what to pick up. -->
     <div id="grocery-readonly-view">
@@ -133,6 +121,25 @@
 </main>
 
 <!-- Put-away modal: turns a checked-out grocery item into a real InventoryItem -->
+<!-- PIN modal — opened by "Unlock to edit". Anyone can see the list on the
+     page behind it without this; this only unlocks adding/editing. -->
+<div class="modal-overlay" id="grocery-pin-modal-overlay" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="grocery-pin-modal-title" style="max-width:340px;">
+    <button class="modal__close" id="grocery-pin-modal-close" aria-label="Close">&times;</button>
+    <h2 id="grocery-pin-modal-title">Unlock to edit</h2>
+    <form id="grocery-pin-form" novalidate>
+      <div class="field" style="margin-bottom:1rem;">
+        <label for="grocery-pin-input" class="visually-hidden">PIN</label>
+        <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" id="grocery-pin-input" autocomplete="off" placeholder="PIN" style="letter-spacing:0.4em; font-size:1.4rem; text-align:center;" />
+      </div>
+      <p class="admin-error" id="grocery-pin-error" role="alert">Incorrect PIN.</p>
+      <div class="form-actions">
+        <button type="submit" class="btn btn--primary" style="width:100%;">UNLOCK</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div class="modal-overlay" id="putaway-modal-overlay" aria-hidden="true">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="putaway-modal-title">
     <button class="modal__close" id="putaway-modal-close" aria-label="Close">&times;</button>

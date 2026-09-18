@@ -42,7 +42,7 @@ function showUnlockedView() {
   document.getElementById("grocery-editor-view").hidden = false;
   document.getElementById("grocery-unlock-toggle-btn").hidden = true;
   document.getElementById("grocery-lock-btn").hidden = false;
-  document.getElementById("grocery-pin-form").hidden = true;
+  closePinModal();
 }
 
 function showLockedView() {
@@ -53,16 +53,14 @@ function showLockedView() {
 }
 
 function handleUnlockToggleClick() {
-  const form = document.getElementById("grocery-pin-form");
-  form.hidden = !form.hidden;
-  if (!form.hidden) document.getElementById("grocery-pin-input").focus();
+  document.getElementById("grocery-pin-error").classList.remove("admin-error--visible");
+  document.getElementById("grocery-pin-input").value = "";
+  openModal(document.getElementById("grocery-pin-modal-overlay"));
+  document.getElementById("grocery-pin-input").focus();
 }
 
-function handlePinCancelClick() {
-  const form = document.getElementById("grocery-pin-form");
-  form.hidden = true;
-  document.getElementById("grocery-pin-input").value = "";
-  document.getElementById("grocery-pin-error").classList.remove("admin-error--visible");
+function closePinModal() {
+  closeModal(document.getElementById("grocery-pin-modal-overlay"));
 }
 
 async function handlePinSubmit(e) {
@@ -759,7 +757,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initGroceryTabs();
   setupLowStockToggle();
   document.getElementById("grocery-unlock-toggle-btn").addEventListener("click", handleUnlockToggleClick);
-  document.getElementById("grocery-pin-cancel-btn").addEventListener("click", handlePinCancelClick);
+  document.getElementById("grocery-pin-modal-close").addEventListener("click", closePinModal);
   document.getElementById("grocery-pin-form").addEventListener("submit", handlePinSubmit);
   document.getElementById("grocery-lock-btn").addEventListener("click", handleLockClick);
   document.getElementById("grocery-add-form").addEventListener("submit", handleAddFormSubmit);

@@ -243,22 +243,6 @@ main { min-height: 60vh; }
   gap: 0.9rem;
 }
 
-.grocery-pin-inline {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  margin: 1rem 0 1.5rem;
-  padding: 1rem 1.25rem;
-  border: 1px solid var(--color-border);
-  background: var(--color-section-bg);
-}
-
-.grocery-pin-inline .admin-error {
-  flex: 1 1 100%;
-  margin: 0;
-}
-
 .toolbar__label {
   font-size: var(--step-caption);
   letter-spacing: 0.1em;
