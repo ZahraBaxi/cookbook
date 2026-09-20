@@ -3,8 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>THE KITCHEN</title>
-<meta name="description" content="A personal cookbook and kitchen inventory." />
+<title>Plants — THE KITCHEN</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -20,19 +19,25 @@
       <li><a href="cookbook.html">COOKBOOK</a></li>
       <li><a href="inventory.html">INVENTORY</a></li>
       <li><a href="groceries.html">GROCERIES</a></li>
-      <li><a href="plants.html">PLANTS</a></li>
+      <li><a href="plants.html" aria-current="page">PLANTS</a></li>
       <li><a href="admin.html">ADMIN</a></li>
     </ul>
   </nav>
 </header>
 
-<main class="shell landing">
-  <h1 data-site-title>Zahra's Space</h1>
-  <p data-home-subtitle>My digital inventory & lists for my home.</p>
-  <div class="landing-links">
-    <a class="btn btn--primary" href="cookbook.html">Browse the Cookbook</a>
-    <a class="btn btn--ghost" href="inventory.html">See the Inventory</a>
-    <a class="btn btn--ghost" href="groceries.html">See Grocery List</a>
+<main>
+  <div class="shell">
+    <div class="page-header">
+      <div class="page-header__eyebrow">Watering schedule</div>
+      <h1>PLANTS</h1>
+      <p class="page-header__subtitle">When each one was last watered, and when it's due next. Managed from Admin → Plants.</p>
+    </div>
+
+    <div id="weather-summary" class="admin-missing-empty" style="padding:0.5rem 0 1.5rem;"></div>
+
+    <div id="plants-view-list" aria-live="polite">
+      <div class="loading-row">Loading…</div>
+    </div>
   </div>
 </main>
 
@@ -44,5 +49,6 @@
 <script src="js/config.js"></script>
 <script src="js/parse.js"></script>
 <script src="js/utils.js"></script>
+<script src="js/plants-view.js"></script>
 </body>
 </html>

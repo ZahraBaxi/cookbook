@@ -73,12 +73,16 @@ check alone is not real security.
   writing to Parse directly, so the Master Key never leaves the server.
 
 **You still need to do one thing in the Back4App dashboard**: set
-`InventoryItem`, `Recipe`, `StorageLayout`, `GroceryItem`, and
-`GroceryLocation`'s Class-Level Permissions to **Public Read**, with **no
+`InventoryItem`, `Recipe`, `StorageLayout`, `GroceryItem`, `GroceryLocation`,
+and `Plant`'s Class-Level Permissions to **Public Read**, with **no
 public write/update/delete**. That closes the last gap — right now, anyone
 with your App ID/JS Key could otherwise write to those classes directly
 through the client SDK, bypassing the site entirely. Cookbook, Inventory,
-and Groceries only ever read, so read access can safely stay public.
+and Groceries only ever read, so read access can safely stay public. Plant
+is included here too even though nothing public-facing reads it today —
+this app has no real per-user auth, only custom session tokens checked in
+Cloud Code, so every class the Admin page reads needs Public Read the same
+way; only writes are actually gated (by `requireAdmin`).
 
 Do not deploy this as "secure" without applying `cloud-code-additions.js`
 and locking down those permissions — as shipped, the original `adminLogin`
@@ -89,32 +93,37 @@ alone does not protect the database.
 **InventoryItem**
 ```
 name            String
-variant         String   (optional — e.g. "Roma", "Cherry" for a Tomato)
-category        String
-location        String
-shelf           String
+variant         String   (optional — e.g. "Roma", "Cherry" for a Tomato; brand/model for an Appliance)
+itemType        String   ("Food" or "Appliance" — see the Appliances section below)
+category        String   (Food only — ignored/blank for Appliances)
+location        String   (Food: one of CONFIG.INVENTORY_LOCATIONS, used by the doll-house picker.
+                          Appliance: free text, e.g. "On top of fridge" — appliances don't use the
+                          doll-house grid system at all, same field, different meaning by itemType)
+shelf           String   (Food only)
 quantity        Number
 unit            String
-level           String
+level           String   (Food only)
 notes           String
-expirationDate  Date
+expirationDate  Date     (Food only)
 ```
 
 **Recipe**
 ```
-title           String
-description     String
-category        String
-recipeType      String   ("Meal", "Component", "From Scratch", "Preserve", "Baking", or "Project")
-difficulty      Number   (1–5, optional)
-servings        Number
-prepTime        Number
-cookTime        Number
-instructions    String
-notes           String
-tags            Array
-ingredients     Array   (see structure below)
-requiresRecipes Array   (titles of other Recipe records this one depends on — see below)
+title              String
+description        String
+category           String
+recipeType         String   ("Meal", "Component", "From Scratch", "Preserve", "Baking", or "Project")
+difficulty         Number   (1–5, optional)
+servings           Number
+prepTime           Number
+cookTime           Number
+instructions       String
+notes              String
+tags               Array
+ingredients        Array   (see structure below)
+requiresRecipes    Array   (titles of other Recipe records this one depends on — see below)
+requiredAppliances Array   (names matched fuzzily against InventoryItem records where
+                            itemType is "Appliance" — see Appliances below)
 ```
 
 `ingredients` is an array of objects:
@@ -179,6 +188,16 @@ token       String
 expiresAt   Date
 ```
 
+**Plant** (managed in Admin → Plants)
+```
+name           String
+location       String   (free text, e.g. "By door")
+isOutdoor      Boolean  (whether recent weather nudges its schedule — see Plants below)
+baseWaterDays  Number   (baseline days between waterings)
+lastWatered    Date
+notes          String
+```
+
 Back4App auto-creates classes and columns the first time data is saved with
 the Master Key, so once `cloud-code-additions.js` is deployed and you save
 your first item through the Admin page, the schema appears on its own — no
@@ -212,6 +231,55 @@ Udon, Yaki Udon, Tanuki Udon, Cold Zaru Udon, Nabe" automatically as you
 add recipes that require it. The Indian batch follows the same pattern —
 Homemade Paneer's detail view will show "Used By: Palak Paneer, Matar
 Paneer, Paneer Tikka, Shahi Paneer" once all four are added.
+
+## Appliances
+
+Inventory items are either **Food** or **Appliance** (`itemType` field).
+The Admin item form has a Food/Appliance toggle right under the name field
+that switches the rest of the form: Food keeps the doll-house
+location/shelf picker, category, quantity, level, and expiration date;
+Appliance swaps all of that for one plain free-text location field (e.g.
+"On top of fridge") since appliances don't live in the Fridge/Freezer/
+Pantry grid at all. The Inventory page has matching Food/Appliances tabs,
+and Copy Inventory has checkboxes to include Food, Appliances, or both in
+what gets copied.
+
+Recipes can name required appliances (`requiredAppliances`, a
+comma-separated field in the admin recipe form, e.g. "Instant Pot,
+Blender"). Each name is matched fuzzily — same matcher as ingredients —
+against InventoryItem records where `itemType` is "Appliance", so
+"instant pot" matches an item literally named "Instant Pot Duo". A recipe
+missing a required appliance shows "MISSING 1 APPLIANCE" (or combined with
+missing ingredients, "MISSING 2 INGREDIENTS + 1 APPLIANCE") and isn't
+counted as ready-to-make, the same way a missing ingredient isn't —
+`computeRecipeReadiness()` in `js/utils.js` checks both. The recipe detail
+view lists each required appliance with a HAVE/MISSING status under
+"Appliances Needed."
+
+## Plants (Admin → Plants)
+
+A watering schedule tracker, separate from Inventory. Each plant has a
+name, a free-text location, whether it's indoor or outdoor, a baseline
+"water every N days" number, and a last-watered date — logged with one
+tap ("💧 Watered Today") rather than typing a date each time.
+
+Outdoor plants get their next-due date nudged by recent weather, fetched
+client-side from [Open-Meteo](https://open-meteo.com) — free, no API key,
+and CORS-enabled so the browser can call it directly (no Cloud Code proxy
+needed, unlike a secret-keyed API). `CONFIG.WEATHER_LATITUDE`/
+`WEATHER_LONGITUDE` (defaults to Sacramento, CA) set where the forecast
+comes from. The adjustment is a rough heuristic, not precision
+irrigation — see `computePlantSchedule()` in `js/admin.js`:
+- Rained at least `CONFIG.WATER_ADJUST_RAIN_THRESHOLD_IN` inches over the
+  last 5 days → push the next-due date out by `WATER_ADJUST_RAIN_DAYS`.
+- Otherwise, average daily high at or above
+  `CONFIG.WATER_ADJUST_HEAT_THRESHOLD_F` → pull it in by
+  `WATER_ADJUST_HEAT_DAYS`.
+- Indoor plants never get a weather adjustment.
+
+All of these thresholds are plain constants in `js/config.js` — adjust
+them (or the whole approach) once you see how it tracks against reality
+for your actual plants.
 
 ## Visual storage layout ("Admin → Layout")
 
@@ -248,14 +316,27 @@ The list itself is visible to EVERYONE who opens the page — no PIN
 needed. That's deliberate: send a family member the link and they can see
 exactly what to pick up without you having to share any credentials. The
 PIN only gates *adding, editing, or checking off* items, via a small
-"🔓 Unlock to edit" toggle that reveals an inline PIN field. It's a much
-lighter 4-digit gate (hardcoded as `"1234"` in Cloud Code — see
-`GROCERY_PIN` in `cloud-code-additions.js`, change it to whatever you
+"🔓 Unlock to edit" button that opens a PIN modal (a lightbox, same as
+every other popup in the app — not an inline form sitting in the page).
+It's a much lighter 4-digit gate (hardcoded as `"1234"` in Cloud Code —
+see `GROCERY_PIN` in `cloud-code-additions.js`, change it to whatever you
 want) than the admin username/password, on purpose, so it's easy to hand
 off without giving out full admin access. Entering the PIN saves a token
 to `localStorage` (not `sessionStorage`, unlike admin) so it stays
 unlocked across app restarts on a phone — reasonable for a shopping list,
 which isn't sensitive data.
+
+**Per-store pages and multi-select filtering.** The read-only view has
+"bubble" filter chips for each store — click one or more to narrow the
+view down, or "All" to clear back to everything (this is a genuine
+multi-select: you can pick, say, both farmers markets at once and hide
+the co-op). Each store section also has a "🔗 Share This Store" button
+that copies a link like `groceries.html?store=Costco` — opening that link
+pre-filters the read-only view to just that one store, so you can hand
+someone "the Costco page" without sending the whole list. The URL updates
+automatically to match whatever's currently filtered, so copying the
+address bar works too. The Check-off tab has the same multi-select bubble
+filter, independent from the read-only view's.
 
 Once unlocked, three tabs on the same `GroceryItem` list:
 
@@ -352,6 +433,10 @@ ingredient ("tomato") still matches ANY typed tomato in stock, while
 typo. It only flags a "different type?" pair when one entry has no Type
 set at all (ambiguous — might really be the same thing as a typed one),
 and never flags two entries that both have an explicit, different Type.
+
+Both Admin → Inventory and Admin → Recipes have "Select all" +
+"Delete Selected" bulk actions above their lists — handy for clearing out
+a section to rebuild from scratch rather than deleting one at a time.
 
 ## Deploying to GitHub Pages
 

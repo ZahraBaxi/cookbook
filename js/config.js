@@ -14,11 +14,25 @@ const CONFIG = {
   PARSE_SERVER_URL: "https://parseapi.back4app.com/",
 
   // Site copy — change wording here and it updates everywhere.
-  SITE_TITLE: "Zahra's Kitchen",
-  HOME_SUBTITLE: "My digital inventory and lists for my kitchen.",
+  SITE_TITLE: "Zahra's Space",
+  HOME_SUBTITLE: "My digital inventory & lists for my home.",
   COOKBOOK_SUBTITLE: "Recipes from my kitchen.",
   INVENTORY_SUBTITLE: "What's in the kitchen.",
   MAIN_SITE_URL: "https://zahrabaxi.com",
+
+  // Plants — used to fetch recent weather (Open-Meteo, free, no API key)
+  // to nudge outdoor plants' watering schedule. Change to your own
+  // coordinates if this ever moves. Defaults to Sacramento, CA.
+  WEATHER_LATITUDE: 38.58,
+  WEATHER_LONGITUDE: -121.49,
+  // If it's rained at least this much (inches) over the last few days,
+  // push an outdoor plant's next watering out by WATER_ADJUST_RAIN_DAYS.
+  WATER_ADJUST_RAIN_THRESHOLD_IN: 0.2,
+  WATER_ADJUST_RAIN_DAYS: 2,
+  // If it's been at least this hot (°F, average daily high) with no rain,
+  // pull an outdoor plant's next watering in by WATER_ADJUST_HEAT_DAYS.
+  WATER_ADJUST_HEAT_THRESHOLD_F: 90,
+  WATER_ADJUST_HEAT_DAYS: 1,
 
   // sessionStorage key used to hold the admin session token.
   // The token proves a successful adminLogin call; it is not a secret
@@ -34,6 +48,12 @@ const CONFIG = {
     "Sauces", "Spices", "Tea", "Frozen", "Snacks", "Baking", "Other",
   ],
   INVENTORY_LOCATIONS: ["Fridge", "Freezer", "Pantry", "Counter", "Other"],
+
+  // Inventory items are either "Food" (uses the doll-house location/shelf
+  // picker below) or "Appliance" (uses a plain free-text location instead,
+  // e.g. "On top of fridge" — appliances don't live in the Fridge/Freezer/
+  // Pantry grid system at all).
+  ITEM_TYPES: ["Food", "Appliance"],
 
   // Visual layout ("doll house") defaults. Each location gets a grid of
   // cells that admin can carve into named zones (shelves, drawers, bins)

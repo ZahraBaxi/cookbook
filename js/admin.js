@@ -14,6 +14,11 @@ const GroceryLocationClass = Parse.Object.extend("GroceryLocation");
 
 let adminInventoryItems = [];
 let adminRecipes = [];
+let selectedInventoryIds = new Set();
+let selectedRecipeIds = new Set();
+let activeInventoryTypeFilter = "All";
+let pendingMergeDeletions = []; // ids to delete after the current item-form save finishes (see confirmMergeInventoryGroup)
+let pendingMergeLabel = "";
 let editingItemId = null;
 let editingRecipeId = null;
 let pendingConfirmAction = null; // async function to run when the shared confirm modal is confirmed
@@ -24,6 +29,9 @@ let storageLayouts = {}; // location -> { objectId, rows, cols, zones } — see 
 let zoneModalContext = null; // { location, zone|null, rect|null, onSaved } — see storage-layout.js
 let groceryLocations = []; // GroceryLocation records (name + emoji) — managed here, used by groceries.html
 let editingGroceryLocationId = null;
+let plants = [];
+let editingPlantId = null;
+let cachedWeather = null; // { recentRainIn, recentMaxTempAvgF } | null — fetched once per admin session
 
 /* ---------------------------------------------------------------------
  * Admin UI preferences — purely local (localStorage), not synced to
@@ -141,6 +149,7 @@ function initTabs() {
     recipes: { tab: document.getElementById("tab-recipes"), panel: document.getElementById("panel-recipes") },
     layout: { tab: document.getElementById("tab-layout"), panel: document.getElementById("panel-layout") },
     groceries: { tab: document.getElementById("tab-groceries"), panel: document.getElementById("panel-groceries") },
+    plants: { tab: document.getElementById("tab-plants"), panel: document.getElementById("panel-plants") },
   };
 
   function activate(name) {
@@ -151,12 +160,14 @@ function initTabs() {
     });
     if (name === "layout") activateLayoutTab();
     if (name === "groceries") loadGroceryLocations();
+    if (name === "plants") activatePlantsTab();
   }
 
   tabs.inventory.tab.addEventListener("click", () => activate("inventory"));
   tabs.recipes.tab.addEventListener("click", () => activate("recipes"));
   tabs.layout.tab.addEventListener("click", () => activate("layout"));
   tabs.groceries.tab.addEventListener("click", () => activate("groceries"));
+  tabs.plants.tab.addEventListener("click", () => activate("plants"));
 }
 
 /* ---------------------------------------------------------------------
@@ -168,6 +179,7 @@ async function loadAdminInventory() {
   listEl.innerHTML = `<div class="loading-row">Loading…</div>`;
   try {
     adminInventoryItems = await new Parse.Query(InventoryItemClass).ascending("name").limit(2000).find();
+    renderInventoryTypeFilter();
     renderAdminInventoryList();
     renderMissingIngredients();
     renderSimilarInventory();
@@ -175,6 +187,25 @@ async function loadAdminInventory() {
     console.error(err);
     listEl.innerHTML = `<div class="empty-state"><p class="empty-state__title">Couldn't load inventory.</p></div>`;
   }
+}
+
+function renderInventoryTypeFilter() {
+  const row = document.getElementById("admin-inventory-type-filter");
+  row.innerHTML = "";
+  ["All", ...CONFIG.ITEM_TYPES].forEach((type) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "filter-chip";
+    btn.textContent = type === "All" ? "ALL" : `${type.toUpperCase()}S`;
+    btn.setAttribute("aria-pressed", String(type === activeInventoryTypeFilter));
+    btn.addEventListener("click", () => {
+      activeInventoryTypeFilter = type;
+      row.querySelectorAll(".filter-chip").forEach((c) => c.setAttribute("aria-pressed", "false"));
+      btn.setAttribute("aria-pressed", "true");
+      renderAdminInventoryList();
+    });
+    row.appendChild(btn);
+  });
 }
 
 /* ---------------------------------------------------------------------
@@ -348,20 +379,19 @@ function confirmMergeInventoryGroup(group) {
   const dropNames = group.duplicates.map((i) => inventoryItemLabel(i)).join(", ");
   let warning = "";
   if (group.reason === "type") {
-    warning = ` One of these has no Type set and the other is typed — double check whether the untyped one should really be merged into "${keepName}" (same specific type) rather than kept as a separate, more generic batch.`;
+    warning = " One of these has no Type set and the other is typed — double check whether the untyped one should really be merged into this one (same specific type) rather than kept as a separate, more generic batch.";
   } else if (group.reason === "words") {
-    warning = ` These were flagged as only POSSIBLY the same thing (one name's words are contained in the other's) — double check "${dropNames}" is really the same item as "${keepName}" and not a genuinely different ingredient before merging.`;
+    warning = ` These were flagged as only POSSIBLY the same thing (one name's words are contained in the other's) — double check "${dropNames}" is really the same item and not a genuinely different ingredient before merging.`;
   }
   openConfirmModal(
     "Merge duplicate inventory items?",
-    `Keeps "${keepName}" — its quantity, shelf, and notes stay exactly as they are — and removes ${group.duplicates.length === 1 ? "the other entry" : "the other entries"}: ${dropNames}. If they represented separate amounts you actually have, add that quantity to "${keepName}" yourself afterward — merging won't add them together automatically since units may not match.${warning}`,
-    "MERGE",
-    async () => {
-      for (const dup of group.duplicates) {
-        await runAdminCloud("adminDeleteInventoryItem", { id: dup.id });
-      }
-      showToast(`Merged into "${keepName}".`);
-      await loadAdminInventory();
+    `Opens "${keepName}" for editing — update the quantity/level here if the amounts should combine (e.g. you had a little cilantro left, then bought more) — then Save. Saving will also remove ${group.duplicates.length === 1 ? "the other entry" : "the other entries"}: ${dropNames}.${warning}`,
+    "CONTINUE",
+    () => {
+      pendingMergeDeletions = group.duplicates.map((d) => d.id);
+      pendingMergeLabel = keepName;
+      openItemForm(group.canonical.id);
+      showToast(`Editing "${keepName}" — Save will also remove: ${dropNames}`);
     }
   );
 }
@@ -443,6 +473,7 @@ function renderAdminInventoryList() {
   const listEl = document.getElementById("admin-inventory-list");
   const query = document.getElementById("admin-inventory-search").value.trim().toLowerCase();
   const filtered = adminInventoryItems.filter((item) => {
+    if (activeInventoryTypeFilter !== "All" && (item.get("itemType") || "Food") !== activeInventoryTypeFilter) return false;
     if (!query) return true;
     return [item.get("name"), item.get("variant"), item.get("category"), item.get("location")].filter(Boolean).join(" ").toLowerCase().includes(query);
   });
@@ -460,6 +491,7 @@ function renderAdminInventoryList() {
     .map(
       (item) => `
       <div class="admin-row">
+        <label class="checkbox-field"><input type="checkbox" class="bulk-select" data-select-item="${item.id}" ${selectedInventoryIds.has(item.id) ? "checked" : ""} /></label>
         <div class="admin-row__title">${escapeHtml(inventoryItemLabel(item))}</div>
         <div>${escapeHtml(item.get("category") || "")}</div>
         <div>${escapeHtml(item.get("location") || "")}${item.get("shelf") ? " · " + escapeHtml(item.get("shelf")) : ""}</div>
@@ -471,9 +503,59 @@ function renderAdminInventoryList() {
     )
     .join("");
 
+  listEl.querySelectorAll("[data-select-item]").forEach((cb) => {
+    cb.addEventListener("change", () => {
+      const id = cb.getAttribute("data-select-item");
+      if (cb.checked) selectedInventoryIds.add(id);
+      else selectedInventoryIds.delete(id);
+      updateInventoryBulkToolbar();
+    });
+  });
+
   listEl.querySelectorAll("[data-edit-item]").forEach((btn) => {
     btn.addEventListener("click", () => openItemForm(btn.getAttribute("data-edit-item")));
   });
+
+  updateInventoryBulkToolbar();
+}
+
+function updateInventoryBulkToolbar() {
+  const deleteBtn = document.getElementById("inventory-delete-selected-btn");
+  deleteBtn.textContent = `DELETE SELECTED (${selectedInventoryIds.size})`;
+  deleteBtn.disabled = selectedInventoryIds.size === 0;
+
+  const visibleIds = Array.from(document.querySelectorAll("#admin-inventory-list [data-select-item]")).map((cb) => cb.getAttribute("data-select-item"));
+  const selectAll = document.getElementById("inventory-select-all");
+  selectAll.checked = visibleIds.length > 0 && visibleIds.every((id) => selectedInventoryIds.has(id));
+}
+
+function handleInventorySelectAllChange(e) {
+  const visibleCheckboxes = document.querySelectorAll("#admin-inventory-list [data-select-item]");
+  visibleCheckboxes.forEach((cb) => {
+    cb.checked = e.target.checked;
+    const id = cb.getAttribute("data-select-item");
+    if (e.target.checked) selectedInventoryIds.add(id);
+    else selectedInventoryIds.delete(id);
+  });
+  updateInventoryBulkToolbar();
+}
+
+function handleDeleteSelectedInventory() {
+  const count = selectedInventoryIds.size;
+  if (count === 0) return;
+  openConfirmModal(
+    `Delete ${count} item${count === 1 ? "" : "s"}?`,
+    "This can't be undone.",
+    "DELETE",
+    async () => {
+      for (const id of selectedInventoryIds) {
+        await runAdminCloud("adminDeleteInventoryItem", { id });
+      }
+      selectedInventoryIds.clear();
+      showToast(`Deleted ${count} item${count === 1 ? "" : "s"}.`);
+      await loadAdminInventory();
+    }
+  );
 }
 
 /* ---------------------------------------------------------------------
@@ -554,6 +636,35 @@ function renderLevelSelector(selected) {
   });
 }
 
+function applyItemTypeVisibility(itemType) {
+  const isAppliance = itemType === "Appliance";
+  document.getElementById("item-food-fields").style.display = isAppliance ? "none" : "contents";
+  document.getElementById("item-appliance-fields").hidden = !isAppliance;
+  document.getElementById("item-variant-label").innerHTML = isAppliance
+    ? 'Brand/model <span style="color:var(--color-text-secondary); font-weight:400;">(optional)</span>'
+    : 'Type <span style="color:var(--color-text-secondary); font-weight:400;">(optional)</span>';
+  document.getElementById("item-variant").placeholder = isAppliance ? "e.g. Ninja, KitchenAid, Instant Pot Duo" : "e.g. Roma, Cherry, Heirloom";
+}
+
+function renderItemTypeSelector(selected) {
+  const container = document.getElementById("item-type-selector");
+  container.innerHTML = "";
+  CONFIG.ITEM_TYPES.forEach((type) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "filter-chip";
+    btn.textContent = type.toUpperCase();
+    btn.setAttribute("aria-pressed", String(type === selected));
+    btn.addEventListener("click", () => {
+      document.getElementById("item-type").value = type;
+      container.querySelectorAll(".filter-chip").forEach((c) => c.setAttribute("aria-pressed", "false"));
+      btn.setAttribute("aria-pressed", "true");
+      applyItemTypeVisibility(type);
+    });
+    container.appendChild(btn);
+  });
+}
+
 function openItemForm(itemId, prefillName) {
   editingItemId = itemId || null;
   const form = document.getElementById("item-form");
@@ -561,15 +672,25 @@ function openItemForm(itemId, prefillName) {
   populateCategorySelect();
 
   const item = itemId ? adminInventoryItems.find((i) => i.id === itemId) : null;
+  const itemType = item ? item.get("itemType") || "Food" : "Food";
 
   document.getElementById("item-modal-title").textContent = item ? "Edit item" : "Add item";
   document.getElementById("item-delete-btn").hidden = !item;
+
+  document.getElementById("item-type").value = itemType;
+  renderItemTypeSelector(itemType);
+  applyItemTypeVisibility(itemType);
 
   if (item) {
     document.getElementById("item-name").value = item.get("name") || "";
     document.getElementById("item-variant").value = item.get("variant") || "";
     document.getElementById("item-category").value = item.get("category") || CONFIG.INVENTORY_CATEGORIES[0];
-    setLocationPickerValue(item.get("location"), item.get("shelf"));
+    if (itemType === "Appliance") {
+      document.getElementById("item-appliance-location").value = item.get("location") || "";
+      setLocationPickerValue(null, null);
+    } else {
+      setLocationPickerValue(item.get("location"), item.get("shelf"));
+    }
     document.getElementById("item-quantity").value = item.get("quantity") ?? "";
     document.getElementById("item-unit").value = item.get("unit") || "";
     const exp = item.get("expirationDate");
@@ -579,6 +700,7 @@ function openItemForm(itemId, prefillName) {
     renderLevelSelector(item.get("level") || "Full");
   } else {
     setLocationPickerValue(null, null);
+    document.getElementById("item-appliance-location").value = "";
     document.getElementById("item-level").value = "Full";
     renderLevelSelector("Full");
     document.getElementById("item-variant").value = "";
@@ -593,8 +715,15 @@ function openItemForm(itemId, prefillName) {
 async function handleItemFormSubmit(e) {
   e.preventDefault();
 
-  if (!document.getElementById("item-location").value) {
+  const itemType = document.getElementById("item-type").value;
+  const isAppliance = itemType === "Appliance";
+
+  if (!isAppliance && !document.getElementById("item-location").value) {
     showToast("Pick a spot for this item first.", "error");
+    return;
+  }
+  if (isAppliance && !document.getElementById("item-appliance-location").value.trim()) {
+    showToast("Add a location for this appliance first.", "error");
     return;
   }
 
@@ -602,18 +731,33 @@ async function handleItemFormSubmit(e) {
   submitBtn.disabled = true;
   submitBtn.textContent = "SAVING…";
 
-  const payload = {
-    name: document.getElementById("item-name").value.trim(),
-    variant: document.getElementById("item-variant").value.trim(),
-    category: document.getElementById("item-category").value,
-    location: document.getElementById("item-location").value,
-    shelf: document.getElementById("item-shelf").value,
-    quantity: parseFloat(document.getElementById("item-quantity").value) || 0,
-    unit: document.getElementById("item-unit").value.trim(),
-    level: document.getElementById("item-level").value,
-    notes: document.getElementById("item-notes").value.trim(),
-    expirationDate: document.getElementById("item-expiration").value || null,
-  };
+  const payload = isAppliance
+    ? {
+        name: document.getElementById("item-name").value.trim(),
+        variant: document.getElementById("item-variant").value.trim(),
+        itemType: "Appliance",
+        category: "",
+        location: document.getElementById("item-appliance-location").value.trim(),
+        shelf: "",
+        quantity: parseFloat(document.getElementById("item-quantity").value) || 0,
+        unit: document.getElementById("item-unit").value.trim(),
+        level: "",
+        notes: document.getElementById("item-notes").value.trim(),
+        expirationDate: null,
+      }
+    : {
+        name: document.getElementById("item-name").value.trim(),
+        variant: document.getElementById("item-variant").value.trim(),
+        itemType: "Food",
+        category: document.getElementById("item-category").value,
+        location: document.getElementById("item-location").value,
+        shelf: document.getElementById("item-shelf").value,
+        quantity: parseFloat(document.getElementById("item-quantity").value) || 0,
+        unit: document.getElementById("item-unit").value.trim(),
+        level: document.getElementById("item-level").value,
+        notes: document.getElementById("item-notes").value.trim(),
+        expirationDate: document.getElementById("item-expiration").value || null,
+      };
 
   try {
     if (editingItemId) {
@@ -622,6 +766,14 @@ async function handleItemFormSubmit(e) {
     } else {
       await runAdminCloud("adminCreateInventoryItem", payload);
       showToast("Item added.");
+    }
+    if (pendingMergeDeletions.length) {
+      for (const dupId of pendingMergeDeletions) {
+        await runAdminCloud("adminDeleteInventoryItem", { id: dupId });
+      }
+      showToast(`Merged into "${pendingMergeLabel}".`);
+      pendingMergeDeletions = [];
+      pendingMergeLabel = "";
     }
     closeModal(document.getElementById("item-modal-overlay"));
     await loadAdminInventory();
@@ -850,6 +1002,7 @@ function renderAdminRecipeList() {
     .map(
       (r) => `
       <div class="admin-row">
+        <label class="checkbox-field"><input type="checkbox" class="bulk-select" data-select-recipe="${r.id}" ${selectedRecipeIds.has(r.id) ? "checked" : ""} /></label>
         <div class="admin-row__title">${escapeHtml(r.get("title"))}</div>
         <div>${escapeHtml(r.get("category") || "")}</div>
         <div>${escapeHtml(r.get("recipeType") || "Meal")}</div>
@@ -861,9 +1014,59 @@ function renderAdminRecipeList() {
     )
     .join("");
 
+  listEl.querySelectorAll("[data-select-recipe]").forEach((cb) => {
+    cb.addEventListener("change", () => {
+      const id = cb.getAttribute("data-select-recipe");
+      if (cb.checked) selectedRecipeIds.add(id);
+      else selectedRecipeIds.delete(id);
+      updateRecipeBulkToolbar();
+    });
+  });
+
   listEl.querySelectorAll("[data-edit-recipe]").forEach((btn) => {
     btn.addEventListener("click", () => openRecipeForm(btn.getAttribute("data-edit-recipe")));
   });
+
+  updateRecipeBulkToolbar();
+}
+
+function updateRecipeBulkToolbar() {
+  const deleteBtn = document.getElementById("recipe-delete-selected-btn");
+  deleteBtn.textContent = `DELETE SELECTED (${selectedRecipeIds.size})`;
+  deleteBtn.disabled = selectedRecipeIds.size === 0;
+
+  const visibleIds = Array.from(document.querySelectorAll("#admin-recipe-list [data-select-recipe]")).map((cb) => cb.getAttribute("data-select-recipe"));
+  const selectAll = document.getElementById("recipe-select-all");
+  selectAll.checked = visibleIds.length > 0 && visibleIds.every((id) => selectedRecipeIds.has(id));
+}
+
+function handleRecipeSelectAllChange(e) {
+  const visibleCheckboxes = document.querySelectorAll("#admin-recipe-list [data-select-recipe]");
+  visibleCheckboxes.forEach((cb) => {
+    cb.checked = e.target.checked;
+    const id = cb.getAttribute("data-select-recipe");
+    if (e.target.checked) selectedRecipeIds.add(id);
+    else selectedRecipeIds.delete(id);
+  });
+  updateRecipeBulkToolbar();
+}
+
+function handleDeleteSelectedRecipes() {
+  const count = selectedRecipeIds.size;
+  if (count === 0) return;
+  openConfirmModal(
+    `Delete ${count} recipe${count === 1 ? "" : "s"}?`,
+    "This can't be undone — useful if you're clearing things out to start a section of the cookbook from scratch.",
+    "DELETE",
+    async () => {
+      for (const id of selectedRecipeIds) {
+        await runAdminCloud("adminDeleteRecipe", { id });
+      }
+      selectedRecipeIds.clear();
+      showToast(`Deleted ${count} recipe${count === 1 ? "" : "s"}.`);
+      await loadAdminRecipes();
+    }
+  );
 }
 
 /* ---------------------------------------------------------------------
@@ -1091,6 +1294,7 @@ function openRecipeForm(recipeId) {
     document.getElementById("recipe-difficulty").value = recipe.get("difficulty") || "";
     document.getElementById("recipe-tags").value = (recipe.get("tags") || []).join(", ");
     document.getElementById("recipe-requires").value = (recipe.get("requiresRecipes") || []).join(", ");
+    document.getElementById("recipe-appliances").value = (recipe.get("requiredAppliances") || []).join(", ");
     document.getElementById("recipe-servings").value = recipe.get("servings") || "";
     document.getElementById("recipe-prep").value = recipe.get("prepTime") || "";
     document.getElementById("recipe-cook").value = recipe.get("cookTime") || "";
@@ -1124,6 +1328,7 @@ async function handleRecipeFormSubmit(e) {
     difficulty: parseInt(document.getElementById("recipe-difficulty").value, 10) || null,
     tags: document.getElementById("recipe-tags").value.split(",").map((t) => t.trim()).filter(Boolean),
     requiresRecipes: document.getElementById("recipe-requires").value.split(",").map((t) => t.trim()).filter(Boolean),
+    requiredAppliances: document.getElementById("recipe-appliances").value.split(",").map((t) => t.trim()).filter(Boolean),
     servings: parseInt(document.getElementById("recipe-servings").value, 10) || null,
     prepTime: parseInt(document.getElementById("recipe-prep").value, 10) || null,
     cookTime: parseInt(document.getElementById("recipe-cook").value, 10) || null,
@@ -1266,6 +1471,228 @@ function handleGroceryLocationDeleteClick() {
 }
 
 /* ---------------------------------------------------------------------
+ * Plants — location + watering schedule (Admin → Plants). Outdoor
+ * plants' next-due date gets nudged by recent weather from Open-Meteo
+ * (free, no API key, called directly from the browser — see
+ * fetchRecentWeather below). This is a rough heuristic, not a precision
+ * irrigation system: it just pushes the date out after real rain, and
+ * pulls it in after a hot dry stretch, using the thresholds in
+ * CONFIG.WATER_ADJUST_*.
+ * ------------------------------------------------------------------- */
+
+async function activatePlantsTab() {
+  const weatherEl = document.getElementById("weather-summary");
+  weatherEl.textContent = "Checking recent weather…";
+  const [plantRecords, weather] = await Promise.all([
+    new Parse.Query(Parse.Object.extend("Plant")).ascending("name").limit(200).find(),
+    cachedWeather ? Promise.resolve(cachedWeather) : fetchRecentWeather(),
+  ]);
+  plants = plantRecords;
+  cachedWeather = weather;
+
+  if (weather) {
+    weatherEl.textContent = `Last few days near you: ${weather.recentRainIn.toFixed(2)}" rain, ${Math.round(weather.recentMaxTempAvgF)}°F avg high. ${weatherNote(weather)}`;
+  } else {
+    weatherEl.textContent = "Couldn't reach the weather service — outdoor plants are showing their un-adjusted schedule.";
+  }
+
+  renderPlantsList();
+}
+
+/**
+ * Open-Meteo: free, no API key, CORS-enabled for direct browser calls.
+ * Pulls the last few days of daily rainfall + high temp for the
+ * configured location (see CONFIG.WEATHER_LATITUDE/LONGITUDE).
+ */
+async function fetchRecentWeather() {
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${CONFIG.WEATHER_LATITUDE}&longitude=${CONFIG.WEATHER_LONGITUDE}&daily=precipitation_sum,temperature_2m_max&past_days=5&forecast_days=1&temperature_unit=fahrenheit&precipitation_unit=inch&timezone=auto`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("Weather request failed");
+    const data = await res.json();
+    const rain = (data.daily.precipitation_sum || []).reduce((sum, v) => sum + (v || 0), 0);
+    const temps = data.daily.temperature_2m_max || [];
+    const avgTemp = temps.length ? temps.reduce((sum, v) => sum + (v || 0), 0) / temps.length : null;
+    return { recentRainIn: rain, recentMaxTempAvgF: avgTemp };
+  } catch (err) {
+    console.error("Weather fetch failed", err);
+    return null;
+  }
+}
+
+function weatherNote(weather) {
+  if (weather.recentRainIn >= CONFIG.WATER_ADJUST_RAIN_THRESHOLD_IN) return "Outdoor plants' next watering is pushed out.";
+  if (weather.recentMaxTempAvgF >= CONFIG.WATER_ADJUST_HEAT_THRESHOLD_F) return "Hot and dry — outdoor plants' next watering is pulled in.";
+  return "No adjustment needed for outdoor plants right now.";
+}
+
+/**
+ * Returns { nextDue: Date, adjustedDays: number, note: string } for one
+ * plant. Indoor plants never get a weather adjustment (adjustedDays 0).
+ */
+function computePlantSchedule(plant, weather) {
+  const lastWatered = plant.get("lastWatered") ? new Date(plant.get("lastWatered")) : new Date();
+  const baseDays = plant.get("baseWaterDays") || 7;
+  let adjustedDays = 0;
+  let note = "";
+
+  if (plant.get("isOutdoor") && weather) {
+    if (weather.recentRainIn >= CONFIG.WATER_ADJUST_RAIN_THRESHOLD_IN) {
+      adjustedDays = CONFIG.WATER_ADJUST_RAIN_DAYS;
+      note = `Recent rain (${weather.recentRainIn.toFixed(2)}") — pushed out ${adjustedDays}d`;
+    } else if (weather.recentMaxTempAvgF >= CONFIG.WATER_ADJUST_HEAT_THRESHOLD_F) {
+      adjustedDays = -CONFIG.WATER_ADJUST_HEAT_DAYS;
+      note = `Hot & dry (avg ${Math.round(weather.recentMaxTempAvgF)}°F) — pulled in ${Math.abs(adjustedDays)}d`;
+    }
+  }
+
+  const nextDue = new Date(lastWatered);
+  nextDue.setDate(nextDue.getDate() + baseDays + adjustedDays);
+  return { lastWatered, nextDue, adjustedDays, note };
+}
+
+function renderPlantsList() {
+  const container = document.getElementById("plants-list");
+  if (plants.length === 0) {
+    container.innerHTML = `<p class="admin-missing-empty">No plants yet — add the first one.</p>`;
+    return;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const withSchedule = plants.map((plant) => ({ plant, schedule: computePlantSchedule(plant, cachedWeather) }));
+  withSchedule.sort((a, b) => a.schedule.nextDue - b.schedule.nextDue);
+
+  container.innerHTML = withSchedule
+    .map(({ plant, schedule }) => {
+      const dueDate = new Date(schedule.nextDue);
+      dueDate.setHours(0, 0, 0, 0);
+      const daysUntil = Math.round((dueDate - today) / (1000 * 60 * 60 * 24));
+      const dueText = daysUntil < 0 ? `OVERDUE by ${Math.abs(daysUntil)}d` : daysUntil === 0 ? "DUE TODAY" : `due in ${daysUntil}d`;
+      const lastWateredText = schedule.lastWatered.toLocaleDateString();
+      const indoorOutdoor = plant.get("isOutdoor") ? "Outdoor" : "Indoor";
+
+      return `
+      <div class="missing-ingredient-row">
+        <div>
+          <div class="missing-ingredient-row__name">${escapeHtml(plant.get("name"))} <span class="missing-ingredient-row__tag">${dueText}</span></div>
+          <div class="missing-ingredient-row__recipes">${escapeHtml(plant.get("location") || "")} · ${indoorOutdoor} · last watered ${escapeHtml(lastWateredText)}${schedule.note ? " · " + escapeHtml(schedule.note) : ""}</div>
+        </div>
+        <div style="display:flex; gap:0.5rem;">
+          <button type="button" class="btn btn--ghost btn--small" data-edit-plant="${plant.id}">EDIT</button>
+          <button type="button" class="btn btn--small btn--primary" data-water-plant="${plant.id}">💧 WATERED TODAY</button>
+        </div>
+      </div>`;
+    })
+    .join("");
+
+  container.querySelectorAll("[data-edit-plant]").forEach((btn) => {
+    btn.addEventListener("click", () => openPlantModal(btn.getAttribute("data-edit-plant")));
+  });
+  container.querySelectorAll("[data-water-plant]").forEach((btn) => {
+    btn.addEventListener("click", () => handleWaterPlant(btn.getAttribute("data-water-plant")));
+  });
+}
+
+async function handleWaterPlant(id) {
+  try {
+    await runAdminCloud("adminLogPlantWatering", { id });
+    showToast("Logged — watered today.");
+    await activatePlantsTab();
+  } catch (err) {
+    console.error(err);
+    showToast(err.message || "Couldn't log watering.", "error");
+  }
+}
+
+function renderPlantOutdoorSelector(selected) {
+  const container = document.getElementById("plant-outdoor-selector");
+  container.innerHTML = "";
+  [
+    { label: "Indoor", value: "false" },
+    { label: "Outdoor", value: "true" },
+  ].forEach(({ label, value }) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "filter-chip";
+    btn.textContent = label.toUpperCase();
+    btn.setAttribute("aria-pressed", String(value === selected));
+    btn.addEventListener("click", () => {
+      document.getElementById("plant-is-outdoor").value = value;
+      container.querySelectorAll(".filter-chip").forEach((c) => c.setAttribute("aria-pressed", "false"));
+      btn.setAttribute("aria-pressed", "true");
+    });
+    container.appendChild(btn);
+  });
+}
+
+function openPlantModal(plantId) {
+  editingPlantId = plantId || null;
+  const plant = plantId ? plants.find((p) => p.id === plantId) : null;
+
+  document.getElementById("plant-modal-title").textContent = plant ? "Edit plant" : "New plant";
+  document.getElementById("plant-name").value = plant ? plant.get("name") || "" : "";
+  document.getElementById("plant-location").value = plant ? plant.get("location") || "" : "";
+  document.getElementById("plant-water-days").value = plant ? plant.get("baseWaterDays") || 7 : 7;
+  document.getElementById("plant-notes").value = plant ? plant.get("notes") || "" : "";
+  const isOutdoor = plant ? String(!!plant.get("isOutdoor")) : "false";
+  document.getElementById("plant-is-outdoor").value = isOutdoor;
+  renderPlantOutdoorSelector(isOutdoor);
+  document.getElementById("plant-delete-btn").hidden = !plant;
+
+  openModal(document.getElementById("plant-modal-overlay"));
+}
+
+async function handlePlantFormSubmit(e) {
+  e.preventDefault();
+  const name = document.getElementById("plant-name").value.trim();
+  const location = document.getElementById("plant-location").value.trim();
+  if (!name || !location) return;
+
+  const payload = {
+    name,
+    location,
+    isOutdoor: document.getElementById("plant-is-outdoor").value === "true",
+    baseWaterDays: parseInt(document.getElementById("plant-water-days").value, 10) || 7,
+    notes: document.getElementById("plant-notes").value.trim(),
+  };
+
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+  submitBtn.textContent = "SAVING…";
+  try {
+    await runAdminCloud("adminSavePlant", { id: editingPlantId, ...payload });
+    closeModal(document.getElementById("plant-modal-overlay"));
+    showToast("Plant saved.");
+    await activatePlantsTab();
+  } catch (err) {
+    console.error(err);
+    showToast(err.message || "Couldn't save plant.", "error");
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = "SAVE";
+  }
+}
+
+function handlePlantDeleteClick() {
+  if (!editingPlantId) return;
+  const plant = plants.find((p) => p.id === editingPlantId);
+  const id = editingPlantId;
+  openConfirmModal(
+    "Delete this plant?",
+    `"${plant ? plant.get("name") : "This plant"}" will be removed from the watering schedule.`,
+    "DELETE",
+    async () => {
+      await runAdminCloud("adminDeletePlant", { id });
+      showToast("Plant deleted.");
+      closeModal(document.getElementById("plant-modal-overlay"));
+      await activatePlantsTab();
+    }
+  );
+}
+
+/* ---------------------------------------------------------------------
  * Shared confirm modal — used for deletes and for merges. Whatever
  * opened it sets pendingConfirmAction; the confirm button just runs it.
  * ------------------------------------------------------------------- */
@@ -1311,12 +1738,22 @@ document.addEventListener("DOMContentLoaded", () => {
   // Inventory
   document.getElementById("add-inventory-btn").addEventListener("click", () => openItemForm(null));
   document.getElementById("item-form").addEventListener("submit", handleItemFormSubmit);
-  document.getElementById("item-cancel-btn").addEventListener("click", () => closeModal(document.getElementById("item-modal-overlay")));
-  document.getElementById("item-modal-close").addEventListener("click", () => closeModal(document.getElementById("item-modal-overlay")));
+  document.getElementById("item-cancel-btn").addEventListener("click", () => {
+    pendingMergeDeletions = [];
+    pendingMergeLabel = "";
+    closeModal(document.getElementById("item-modal-overlay"));
+  });
+  document.getElementById("item-modal-close").addEventListener("click", () => {
+    pendingMergeDeletions = [];
+    pendingMergeLabel = "";
+    closeModal(document.getElementById("item-modal-overlay"));
+  });
   document.getElementById("item-delete-btn").addEventListener("click", handleItemDeleteClick);
   document.getElementById("item-location-picker-btn").addEventListener("click", openLocationPickerModal);
   document.getElementById("location-picker-modal-close").addEventListener("click", () => closeModal(document.getElementById("location-picker-modal-overlay")));
   document.getElementById("admin-inventory-search").addEventListener("input", renderAdminInventoryList);
+  document.getElementById("inventory-select-all").addEventListener("change", handleInventorySelectAllChange);
+  document.getElementById("inventory-delete-selected-btn").addEventListener("click", handleDeleteSelectedInventory);
 
   // Layout
   document.getElementById("zone-form").addEventListener("submit", handleZoneFormSubmit);
@@ -1331,6 +1768,12 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("grocery-location-modal-close").addEventListener("click", () => closeModal(document.getElementById("grocery-location-modal-overlay")));
   document.getElementById("grocery-location-delete-btn").addEventListener("click", handleGroceryLocationDeleteClick);
 
+  document.getElementById("add-plant-btn").addEventListener("click", () => openPlantModal(null));
+  document.getElementById("plant-form").addEventListener("submit", handlePlantFormSubmit);
+  document.getElementById("plant-cancel-btn").addEventListener("click", () => closeModal(document.getElementById("plant-modal-overlay")));
+  document.getElementById("plant-modal-close").addEventListener("click", () => closeModal(document.getElementById("plant-modal-overlay")));
+  document.getElementById("plant-delete-btn").addEventListener("click", handlePlantDeleteClick);
+
   setupCollapsibleSection("missingIngredients", "toggle-missing-ingredients");
   setupCollapsibleSection("similarInventory", "toggle-similar-inventory");
 
@@ -1342,6 +1785,8 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("recipe-delete-btn").addEventListener("click", handleRecipeDeleteClick);
   document.getElementById("add-ingredient-row").addEventListener("click", () => addIngredientRow());
   document.getElementById("admin-recipe-search").addEventListener("input", renderAdminRecipeList);
+  document.getElementById("recipe-select-all").addEventListener("change", handleRecipeSelectAllChange);
+  document.getElementById("recipe-delete-selected-btn").addEventListener("click", handleDeleteSelectedRecipes);
 
   // Confirm modal
   document.getElementById("confirm-modal-confirm").addEventListener("click", handleConfirmModalConfirm);

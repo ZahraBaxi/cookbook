@@ -44,6 +44,14 @@
 
 html { -webkit-text-size-adjust: 100%; }
 
+/* CRITICAL: without this, any element that both has the [hidden]
+   attribute AND a class setting its own `display` (e.g. .btn {
+   display: inline-flex }) stays visible — the class's display wins over
+   the browser's default [hidden]{display:none} rule since both are
+   author-level concerns to the CSS engine. This one rule guarantees
+   hidden always actually hides, site-wide. */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   background: var(--color-bg);
@@ -712,6 +720,13 @@ main { min-height: 60vh; }
 
 .checkbox-field input { width: auto; }
 
+/* Default browser checkboxes/radios render in an accent blue — override
+   to match the black & white design system instead. */
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--color-text);
+}
+
 .level-selector {
   display: flex;
   flex-wrap: wrap;
@@ -873,7 +888,7 @@ main { min-height: 60vh; }
 
 .admin-row {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr auto;
+  grid-template-columns: auto 2fr 1fr 1fr 1fr auto;
   gap: 1rem;
   align-items: center;
   padding: 0.9rem 0;

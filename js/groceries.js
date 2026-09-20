@@ -24,7 +24,8 @@ let groceryLocations = [];
 let groceryItems = [];
 let lowStockItems = [];
 let storageLayouts = {}; // location -> { rows, cols, zones } — see storage-layout.js, used by the put-away picker
-let activeCheckLocation = "All";
+let activeCheckLocations = new Set(); // empty = show all stores
+let activeReadonlyLocations = new Set(); // empty = show all stores. Pre-set from ?store= on load.
 let editingGroceryItemId = null; // set while the Add form is editing an existing item
 let putawayGroceryItem = null; // the checked-out GroceryItem currently being put away
 
@@ -169,7 +170,8 @@ function locationHasBulkBins(name) {
 }
 
 function itemDisplayLine(item) {
-  return item.get("bulk") ? `${item.get("name")} 🫙 bulk` : item.get("name");
+  const base = item.get("bulk") ? `${item.get("name")} 🫙 bulk` : item.get("name");
+  return item.get("url") ? `${escapeHtml(base)} <a href="${escapeHtml(item.get("url"))}" target="_blank" rel="noopener" style="text-decoration:underline;">🔗</a>` : escapeHtml(base);
 }
 
 /**
@@ -278,13 +280,78 @@ function markInventoryItemFinished(inventoryItemId) {
 }
 
 /* ---------------------------------------------------------------------
+ * Multi-select "bubble" location filter — shared by the read-only view
+ * and the Check-off tab. An empty active set means "show everything";
+ * clicking "All" clears the set, clicking a store toggles it in/out so
+ * more than one can be selected at once (e.g. "show me Costco AND the
+ * co-op, not the farmers markets").
+ * ------------------------------------------------------------------- */
+
+function renderLocationBubbleFilter(containerId, activeSet, locationsInUse, onChange) {
+  const container = document.getElementById(containerId);
+  const sorted = [...new Set(locationsInUse)].sort((a, b) => locationLabel(a).localeCompare(locationLabel(b)));
+  const chips = [{ key: "__all__", label: "All" }, ...sorted.map((loc) => ({ key: loc, label: locationLabel(loc) }))];
+
+  container.innerHTML = chips
+    .map(({ key, label }) => {
+      const isActive = key === "__all__" ? activeSet.size === 0 : activeSet.has(key);
+      return `<button type="button" class="filter-chip" data-loc-key="${escapeHtml(key)}" aria-pressed="${isActive}">${escapeHtml(label)}</button>`;
+    })
+    .join("");
+
+  container.querySelectorAll("[data-loc-key]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const key = btn.getAttribute("data-loc-key");
+      if (key === "__all__") {
+        activeSet.clear();
+      } else if (activeSet.has(key)) {
+        activeSet.delete(key);
+      } else {
+        activeSet.add(key);
+      }
+      onChange();
+    });
+  });
+}
+
+/**
+ * Copies a link that opens this page pre-filtered to just one store —
+ * "the Costco page" you can send to someone without sharing the whole
+ * list. Reading the list never needs the PIN, so the link works for
+ * anyone.
+ */
+function copyStoreLink(location) {
+  const url = new URL(window.location.href);
+  url.search = "";
+  url.searchParams.set("store", location);
+  const text = url.toString();
+  navigator.clipboard
+    .writeText(text)
+    .then(() => showToast(`Link copied for "${locationLabel(location)}".`))
+    .catch(() => window.prompt("Copy this link:", text));
+}
+
+/* ---------------------------------------------------------------------
  * Read-only view — visible to everyone, no PIN required. Only shows
  * items still actively needed (not yet bought/checked off).
  * ------------------------------------------------------------------- */
 
 function renderReadonlyList() {
   const container = document.getElementById("grocery-readonly-list");
-  const items = activeGroceryItems();
+  const allActive = activeGroceryItems();
+
+  renderLocationBubbleFilter(
+    "grocery-readonly-location-filter",
+    activeReadonlyLocations,
+    allActive.map((i) => i.get("location") || ""),
+    () => {
+      renderReadonlyList();
+      updateUrlForReadonlyFilter();
+    }
+  );
+
+  const items = activeReadonlyLocations.size === 0 ? allActive : allActive.filter((i) => activeReadonlyLocations.has(i.get("location") || ""));
+
   if (items.length === 0) {
     container.innerHTML = `<p class="admin-missing-empty">Nothing on the list right now.</p>`;
     return;
@@ -306,19 +373,42 @@ function renderReadonlyList() {
           (item) => `
         <div class="missing-ingredient-row">
           <div>
-            <div class="missing-ingredient-row__name">${escapeHtml(itemDisplayLine(item))}</div>
+            <div class="missing-ingredient-row__name">${itemDisplayLine(item)}</div>
             <div class="missing-ingredient-row__recipes">${escapeHtml(item.get("category") || "")}</div>
           </div>
         </div>`
         )
         .join("");
+      const shareBtn = location ? `<button type="button" class="btn btn--ghost btn--small" data-copy-store-link="${escapeHtml(location)}">🔗 SHARE THIS STORE</button>` : "";
       return `
         <div class="admin-missing-section">
-          <div class="admin-missing-section__title">${escapeHtml(locationLabel(location).toUpperCase())}</div>
+          <div class="admin-missing-section__header">
+            <div class="admin-missing-section__title">${escapeHtml(locationLabel(location).toUpperCase())}</div>
+            ${shareBtn}
+          </div>
           ${rows}
         </div>`;
     })
     .join("");
+
+  container.querySelectorAll("[data-copy-store-link]").forEach((btn) => {
+    btn.addEventListener("click", () => copyStoreLink(btn.getAttribute("data-copy-store-link")));
+  });
+}
+
+/**
+ * Keeps the URL's ?store= param in sync with the read-only filter, so
+ * refreshing or copying the address bar URL preserves whatever's
+ * currently selected (single store or "All").
+ */
+function updateUrlForReadonlyFilter() {
+  const url = new URL(window.location.href);
+  if (activeReadonlyLocations.size === 1) {
+    url.searchParams.set("store", [...activeReadonlyLocations][0]);
+  } else {
+    url.searchParams.delete("store");
+  }
+  window.history.replaceState({}, "", url);
 }
 
 /* ---------------------------------------------------------------------
@@ -349,7 +439,7 @@ function renderAddList() {
           (item) => `
         <div class="missing-ingredient-row">
           <div>
-            <div class="missing-ingredient-row__name">${escapeHtml(itemDisplayLine(item))}</div>
+            <div class="missing-ingredient-row__name">${itemDisplayLine(item)}</div>
             <div class="missing-ingredient-row__recipes">${escapeHtml(item.get("category") || "")}</div>
           </div>
           <div style="display:flex; gap:0.5rem;">
@@ -385,6 +475,7 @@ function startEditingGroceryItem(id) {
   document.getElementById("grocery-item-location").value = item.get("location") || "";
   updateBulkFieldVisibility();
   document.getElementById("grocery-item-bulk").checked = !!item.get("bulk");
+  document.getElementById("grocery-item-url").value = item.get("url") || "";
 
   document.getElementById("grocery-add-submit-btn").textContent = "SAVE CHANGES";
   document.getElementById("grocery-add-cancel-edit-btn").hidden = false;
@@ -412,6 +503,7 @@ async function handleAddFormSubmit(e) {
     category: document.getElementById("grocery-item-category").value,
     location,
     bulk: locationHasBulkBins(location) ? document.getElementById("grocery-item-bulk").checked : false,
+    url: document.getElementById("grocery-item-url").value.trim(),
   };
 
   const submitBtn = document.getElementById("grocery-add-submit-btn");
@@ -444,31 +536,22 @@ async function handleAddFormSubmit(e) {
  * ------------------------------------------------------------------- */
 
 function renderCheckLocationFilter() {
-  const container = document.getElementById("grocery-check-location-filter");
   const items = activeGroceryItems();
-  const locationsInUse = [...new Set(items.map((i) => i.get("location") || ""))];
-  const chips = ["All", ...locationsInUse.sort((a, b) => locationLabel(a).localeCompare(locationLabel(b)))];
-
-  container.innerHTML = chips
-    .map((loc) => {
-      const label = loc === "All" ? "All" : locationLabel(loc);
-      const isActive = activeCheckLocation === loc;
-      return `<button type="button" class="filter-chip" data-location="${escapeHtml(loc)}" aria-pressed="${isActive}">${escapeHtml(label)}</button>`;
-    })
-    .join("");
-
-  container.querySelectorAll("[data-location]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      activeCheckLocation = btn.getAttribute("data-location");
+  renderLocationBubbleFilter(
+    "grocery-check-location-filter",
+    activeCheckLocations,
+    items.map((i) => i.get("location") || ""),
+    () => {
       renderCheckLocationFilter();
       renderCheckList();
-    });
-  });
+    }
+  );
 }
 
 function renderCheckList() {
   const container = document.getElementById("grocery-check-list");
-  const filtered = activeGroceryItems().filter((item) => activeCheckLocation === "All" || (item.get("location") || "") === activeCheckLocation);
+  const allActive = activeGroceryItems();
+  const filtered = activeCheckLocations.size === 0 ? allActive : allActive.filter((item) => activeCheckLocations.has(item.get("location") || ""));
 
   if (filtered.length === 0) {
     container.innerHTML = `<p class="admin-missing-empty">Nothing here — everything's checked off, or try a different location.</p>`;
@@ -492,7 +575,7 @@ function renderCheckList() {
         <label class="missing-ingredient-row" style="cursor:pointer;">
           <span class="checkbox-field" style="gap:0.75rem;">
             <input type="checkbox" data-check-item="${item.id}" />
-            <span class="missing-ingredient-row__name" style="font-weight:600;">${escapeHtml(itemDisplayLine(item))}</span>
+            <span class="missing-ingredient-row__name" style="font-weight:600;">${itemDisplayLine(item)}</span>
           </span>
           <span class="missing-ingredient-row__recipes">${escapeHtml(locationLabel(item.get("location")))}</span>
         </label>`
@@ -543,7 +626,7 @@ function renderCheckoutList() {
       (item) => `
       <div class="missing-ingredient-row">
         <div>
-          <div class="missing-ingredient-row__name">${escapeHtml(itemDisplayLine(item))}</div>
+          <div class="missing-ingredient-row__name">${itemDisplayLine(item)}</div>
           <div class="missing-ingredient-row__recipes">${escapeHtml([item.get("category"), locationLabel(item.get("location"))].filter(Boolean).join(" · "))}</div>
         </div>
         <div style="display:flex; gap:0.5rem;">
@@ -777,5 +860,13 @@ document.addEventListener("DOMContentLoaded", () => {
   } else {
     showLockedView();
   }
+
+  // A link like groceries.html?store=Costco opens straight to that one
+  // store's list — "the Costco page" you can hand off without sharing
+  // everything. renderReadonlyList() re-validates this against whatever
+  // stores actually have items once data loads.
+  const storeParam = new URLSearchParams(window.location.search).get("store");
+  if (storeParam) activeReadonlyLocations = new Set([storeParam]);
+
   loadGroceryData();
 });

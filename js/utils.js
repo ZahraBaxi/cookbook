@@ -328,6 +328,7 @@ function computeRecipeReadiness(recipe, allRecipes, inventoryItems, visitedTitle
       ready: false,
       ownAvailability: [],
       missingIngredients: [{ name: `${recipe.get("title")} (circular dependency)`, optional: false, forRecipeTitle: recipe.get("title") }],
+      missingAppliances: [],
       components: [],
     };
   }
@@ -338,6 +339,16 @@ function computeRecipeReadiness(recipe, allRecipes, inventoryItems, visitedTitle
     .filter((a) => !a.have && !a.ingredient.optional)
     .map((a) => ({ name: a.ingredient.name, optional: false, forRecipeTitle: recipe.get("title") }));
 
+  // Appliances are checked separately from ingredients — matched only
+  // against InventoryItem records marked itemType "Appliance", using the
+  // same fuzzy name matcher ("instant pot" matches an item named "Instant
+  // Pot Duo", etc.). A recipe missing a required appliance can't be made
+  // regardless of what ingredients are on hand, so it factors into `ready`
+  // the same way a missing ingredient does.
+  const applianceInventory = inventoryItems.filter((i) => i.get("itemType") === "Appliance");
+  const requiredAppliances = recipe.get("requiredAppliances") || [];
+  const ownMissingAppliances = requiredAppliances.filter((name) => !matchIngredientAgainstInventory(name, applianceInventory).have);
+
   const requiresList = recipe.get("requiresRecipes") || [];
   const components = requiresList.map((reqTitle) => {
     const reqRecipe = findRecipeByTitle(reqTitle, allRecipes);
@@ -347,16 +358,18 @@ function computeRecipeReadiness(recipe, allRecipes, inventoryItems, visitedTitle
         found: false,
         ready: false,
         missingIngredients: [{ name: `${reqTitle} (recipe not found)`, optional: false, forRecipeTitle: reqTitle }],
+        missingAppliances: [],
       };
     }
     const sub = computeRecipeReadiness(reqRecipe, allRecipes, inventoryItems, visited);
-    return { title: reqRecipe.get("title"), found: true, ready: sub.ready, missingIngredients: sub.missingIngredients };
+    return { title: reqRecipe.get("title"), found: true, ready: sub.ready, missingIngredients: sub.missingIngredients, missingAppliances: sub.missingAppliances };
   });
 
   const missingIngredients = [...ownMissing, ...components.flatMap((c) => c.missingIngredients)];
-  const ready = ownMissing.length === 0 && components.every((c) => c.ready);
+  const missingAppliances = [...ownMissingAppliances, ...components.flatMap((c) => c.missingAppliances)];
+  const ready = ownMissing.length === 0 && ownMissingAppliances.length === 0 && components.every((c) => c.ready);
 
-  return { ready, ownAvailability, missingIngredients, components };
+  return { ready, ownAvailability, missingIngredients, missingAppliances, components };
 }
 
 /* ---------------------------------------------------------------------

@@ -157,6 +157,14 @@ function recipeMatchesSearch(recipe) {
   return haystack.includes(q);
 }
 
+function readinessBadgeText(readiness) {
+  if (readiness.ready) return "READY TO MAKE";
+  const parts = [];
+  if (readiness.missingIngredients.length) parts.push(`${readiness.missingIngredients.length} INGREDIENT${readiness.missingIngredients.length === 1 ? "" : "S"}`);
+  if (readiness.missingAppliances.length) parts.push(`${readiness.missingAppliances.length} APPLIANCE${readiness.missingAppliances.length === 1 ? "" : "S"}`);
+  return `MISSING ${parts.join(" + ")}`;
+}
+
 function renderRecipes() {
   const resultsEl = document.getElementById("recipe-results");
   const filtered = allRecipes.filter((r) => recipeMatchesFilter(r) && recipeMatchesType(r) && recipeMatchesReadiness(r) && recipeMatchesSearch(r));
@@ -176,7 +184,6 @@ function renderRecipes() {
   filtered.forEach((recipe) => {
     const readiness = computeRecipeReadiness(recipe, allRecipes, allInventoryItems);
     const ready = readiness.ready;
-    const missingCount = readiness.missingIngredients.length;
     const timeLabel = formatTime(recipe.get("prepTime"), recipe.get("cookTime"));
     const type = recipe.get("recipeType") || "Meal";
     const stars = starRating(recipe.get("difficulty"));
@@ -188,7 +195,7 @@ function renderRecipes() {
       <div class="recipe-card__meta">${escapeHtml((recipe.get("category") || "RECIPE").toUpperCase())}${timeLabel ? " · " + timeLabel : ""} · ${escapeHtml(type.toUpperCase())}${stars ? ` · ${stars}` : ""}</div>
       <div class="recipe-card__title">${escapeHtml(recipe.get("title") || "Untitled")}</div>
       <div class="recipe-card__desc">${escapeHtml(recipe.get("description") || "")}</div>
-      <span class="status-tag ${ready ? "status-tag--ready" : ""}">${ready ? "READY TO MAKE" : `MISSING ${missingCount} INGREDIENT${missingCount === 1 ? "" : "S"}`}</span>
+      <span class="status-tag ${ready ? "status-tag--ready" : ""}">${readinessBadgeText(readiness)}</span>
     `;
     card.addEventListener("click", () => openRecipeDetail(recipe));
     grid.appendChild(card);
@@ -203,7 +210,6 @@ function openRecipeDetail(recipe) {
   const content = document.getElementById("recipe-modal-content");
   const readiness = computeRecipeReadiness(recipe, allRecipes, allInventoryItems);
   const ready = readiness.ready;
-  const missingCount = readiness.missingIngredients.length;
 
   const metaParts = [];
   if (recipe.get("category")) metaParts.push(escapeHtml(recipe.get("category").toUpperCase()));
@@ -243,14 +249,26 @@ function openRecipeDetail(recipe) {
     })
     .join("");
 
+  const applianceRows = (recipe.get("requiredAppliances") || [])
+    .map((name) => {
+      const have = !readiness.missingAppliances.includes(name);
+      return `
+        <li>
+          <span>${escapeHtml(name)}</span>
+          <span class="ingredient-status ${have ? "ingredient-status--have" : "ingredient-status--missing"}">${have ? "✓ HAVE" : "— MISSING"}</span>
+        </li>`;
+    })
+    .join("");
+
   content.innerHTML = `
     <h2 id="recipe-modal-title">${escapeHtml(recipe.get("title") || "Untitled")}</h2>
     <div class="recipe-detail__meta">${metaParts.join('<span aria-hidden="true">·</span>')}</div>
     ${recipe.get("description") ? `<p>${escapeHtml(recipe.get("description"))}</p>` : ""}
     <div class="recipe-detail__status">
-      <span class="status-tag ${ready ? "status-tag--ready" : ""}">${ready ? "READY TO MAKE" : `MISSING ${missingCount} INGREDIENT${missingCount === 1 ? "" : "S"}`}</span>
+      <span class="status-tag ${ready ? "status-tag--ready" : ""}">${readinessBadgeText(readiness)}</span>
     </div>
     ${componentRows ? `<h3 class="recipe-detail__section-title">Requires</h3><ul class="component-list">${componentRows}</ul>` : ""}
+    ${applianceRows ? `<h3 class="recipe-detail__section-title">Appliances Needed</h3><ul class="ingredient-list">${applianceRows}</ul>` : ""}
     ${usedBy.length ? `<h3 class="recipe-detail__section-title">Used By</h3><p class="recipe-detail__notes">${escapeHtml(usedBy.map((r) => r.get("title")).join(", "))}</p>` : ""}
     <h3 class="recipe-detail__section-title">Ingredients</h3>
     <ul class="ingredient-list">${ingredientRows || "<li>No ingredients listed.</li>"}</ul>

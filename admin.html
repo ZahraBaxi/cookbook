@@ -20,6 +20,7 @@
       <li><a href="cookbook.html">COOKBOOK</a></li>
       <li><a href="inventory.html">INVENTORY</a></li>
       <li><a href="groceries.html">GROCERIES</a></li>
+      <li><a href="plants.html">PLANTS</a></li>
       <li><a href="admin.html" aria-current="page">ADMIN</a></li>
     </ul>
   </nav>
@@ -64,6 +65,7 @@
       <button class="admin-tab" role="tab" id="tab-recipes" aria-selected="false" aria-controls="panel-recipes">RECIPES</button>
       <button class="admin-tab" role="tab" id="tab-layout" aria-selected="false" aria-controls="panel-layout">LAYOUT</button>
       <button class="admin-tab" role="tab" id="tab-groceries" aria-selected="false" aria-controls="panel-groceries">GROCERIES</button>
+      <button class="admin-tab" role="tab" id="tab-plants" aria-selected="false" aria-controls="panel-plants">PLANTS</button>
     </div>
 
     <!-- Inventory panel -->
@@ -93,7 +95,15 @@
           <label for="admin-inventory-search" class="visually-hidden">Search inventory</label>
           <input type="search" id="admin-inventory-search" placeholder="Search inventory..." />
         </div>
+        <div class="filter-row" id="admin-inventory-type-filter" role="group" aria-label="Filter by item type"></div>
         <button class="btn btn--primary" id="add-inventory-btn">+ ADD ITEM</button>
+      </div>
+      <div class="admin-table-toolbar" id="inventory-bulk-toolbar" style="padding-top:0;">
+        <label class="checkbox-field">
+          <input type="checkbox" id="inventory-select-all" />
+          <span>Select all</span>
+        </label>
+        <button class="btn btn--danger btn--small" id="inventory-delete-selected-btn" disabled>DELETE SELECTED (0)</button>
       </div>
       <div id="admin-inventory-list" class="admin-list" aria-live="polite">
         <div class="loading-row">Loading…</div>
@@ -122,6 +132,13 @@
           <input type="search" id="admin-recipe-search" placeholder="Search recipes..." />
         </div>
         <button class="btn btn--primary" id="add-recipe-btn">+ ADD RECIPE</button>
+      </div>
+      <div class="admin-table-toolbar" id="recipe-bulk-toolbar" style="padding-top:0;">
+        <label class="checkbox-field">
+          <input type="checkbox" id="recipe-select-all" />
+          <span>Select all</span>
+        </label>
+        <button class="btn btn--danger btn--small" id="recipe-delete-selected-btn" disabled>DELETE SELECTED (0)</button>
       </div>
       <div id="admin-recipe-list" class="admin-list" aria-live="polite">
         <div class="loading-row">Loading…</div>
@@ -154,11 +171,26 @@
         <div class="loading-row">Loading…</div>
       </div>
     </div>
+
+    <!-- Plants panel -->
+    <div id="panel-plants" role="tabpanel" aria-labelledby="tab-plants" hidden>
+      <p class="admin-missing-empty" style="padding:1rem 0;">
+        Watering schedule for each plant. Outdoor plants get their next-due date nudged based on
+        recent weather (rain pushes it out, hot/dry pulls it in) — see the note under each one.
+      </p>
+      <div class="admin-table-toolbar">
+        <button type="button" class="btn btn--primary" id="add-plant-btn">+ ADD PLANT</button>
+      </div>
+      <div id="weather-summary" class="admin-missing-empty" style="padding:0.5rem 0 1rem;"></div>
+      <div id="plants-list">
+        <div class="loading-row">Loading…</div>
+      </div>
+    </div>
   </section>
 </main>
 
 <footer class="site-footer">
-  <div class="shell" data-site-footer>Zahra's Kitchen.</div>
+  <div class="shell" data-site-footer>Zahra's Space.</div>
 </footer>
 
 <!-- Inventory item form modal -->
@@ -172,40 +204,58 @@
           <label for="item-name">Name</label>
           <input type="text" id="item-name" name="name" data-autofocus required />
         </div>
+        <div class="field field--full">
+          <label>Type of item</label>
+          <div class="level-selector" id="item-type-selector"></div>
+          <input type="hidden" id="item-type" name="itemType" value="Food" />
+        </div>
         <div class="field">
-          <label for="item-variant">Type <span style="color:var(--color-text-secondary); font-weight:400;">(optional)</span></label>
+          <label for="item-variant" id="item-variant-label">Type <span style="color:var(--color-text-secondary); font-weight:400;">(optional)</span></label>
           <input type="text" id="item-variant" name="variant" placeholder="e.g. Roma, Cherry, Heirloom" />
         </div>
-        <div class="field">
-          <label for="item-category">Category</label>
-          <select id="item-category" name="category"></select>
+
+        <!-- Food-only fields -->
+        <div id="item-food-fields" class="form-grid" style="display:contents;">
+          <div class="field">
+            <label for="item-category">Category</label>
+            <select id="item-category" name="category"></select>
+          </div>
+          <div class="field field--full">
+            <label>Where is it?</label>
+            <button type="button" class="location-picker-btn" id="item-location-picker-btn">
+              <span id="item-location-picker-label">Not set</span>
+              <span class="location-picker-btn__arrow">↳</span>
+            </button>
+            <input type="hidden" id="item-location" name="location" />
+            <input type="hidden" id="item-shelf" name="shelf" />
+          </div>
+          <div class="field">
+            <label for="item-quantity">Quantity</label>
+            <input type="number" id="item-quantity" name="quantity" min="0" step="0.1" />
+          </div>
+          <div class="field">
+            <label for="item-unit">Unit</label>
+            <input type="text" id="item-unit" name="unit" placeholder="bottle, g, cup…" />
+          </div>
+          <div class="field">
+            <label for="item-expiration">Expiration date</label>
+            <input type="date" id="item-expiration" name="expirationDate" />
+          </div>
+          <div class="field field--full">
+            <label>Level</label>
+            <div class="level-selector" id="item-level-selector"></div>
+            <input type="hidden" id="item-level" name="level" value="Full" />
+          </div>
         </div>
-        <div class="field field--full">
-          <label>Where is it?</label>
-          <button type="button" class="location-picker-btn" id="item-location-picker-btn">
-            <span id="item-location-picker-label">Not set</span>
-            <span class="location-picker-btn__arrow">↳</span>
-          </button>
-          <input type="hidden" id="item-location" name="location" required />
-          <input type="hidden" id="item-shelf" name="shelf" />
+
+        <!-- Appliance-only field: plain text location, no doll-house picker -->
+        <div id="item-appliance-fields" hidden>
+          <div class="field field--full">
+            <label for="item-appliance-location">Location <span style="color:var(--color-text-secondary); font-weight:400;">(e.g. "On top of fridge")</span></label>
+            <input type="text" id="item-appliance-location" placeholder="On top of fridge" />
+          </div>
         </div>
-        <div class="field">
-          <label for="item-quantity">Quantity</label>
-          <input type="number" id="item-quantity" name="quantity" min="0" step="0.1" />
-        </div>
-        <div class="field">
-          <label for="item-unit">Unit</label>
-          <input type="text" id="item-unit" name="unit" placeholder="bottle, g, cup…" />
-        </div>
-        <div class="field">
-          <label for="item-expiration">Expiration date</label>
-          <input type="date" id="item-expiration" name="expirationDate" />
-        </div>
-        <div class="field field--full">
-          <label>Level</label>
-          <div class="level-selector" id="item-level-selector"></div>
-          <input type="hidden" id="item-level" name="level" value="Full" />
-        </div>
+
         <div class="field field--full">
           <label for="item-notes">Notes</label>
           <textarea id="item-notes" name="notes" rows="3"></textarea>
@@ -254,6 +304,10 @@
         <div class="field field--full">
           <label for="recipe-requires">Requires (comma-separated recipe titles)</label>
           <input type="text" id="recipe-requires" name="requiresRecipes" placeholder="Homemade Udon Noodles, Homemade Awase Dashi" />
+        </div>
+        <div class="field field--full">
+          <label for="recipe-appliances">Required appliances (comma-separated, optional)</label>
+          <input type="text" id="recipe-appliances" name="requiredAppliances" placeholder="Instant Pot, Blender" />
         </div>
         <div class="field">
           <label for="recipe-servings">Servings</label>
@@ -357,6 +411,44 @@
         <button type="submit" class="btn btn--primary">SAVE</button>
         <button type="button" class="btn btn--ghost" id="grocery-location-cancel-btn">CANCEL</button>
         <button type="button" class="btn btn--danger" id="grocery-location-delete-btn" hidden style="margin-left:auto;">DELETE</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Plant edit modal (Admin → Plants) -->
+<div class="modal-overlay" id="plant-modal-overlay" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="plant-modal-title" style="max-width:420px;">
+    <button class="modal__close" id="plant-modal-close" aria-label="Close">&times;</button>
+    <h2 id="plant-modal-title">New plant</h2>
+    <form id="plant-form" novalidate>
+      <div class="form-grid form-grid--single">
+        <div class="field">
+          <label for="plant-name">Name</label>
+          <input type="text" id="plant-name" name="name" data-autofocus required placeholder="Monstera" />
+        </div>
+        <div class="field">
+          <label for="plant-location">Location</label>
+          <input type="text" id="plant-location" name="location" required placeholder="By door" />
+        </div>
+        <div class="field">
+          <label>Indoor or outdoor?</label>
+          <div class="level-selector" id="plant-outdoor-selector"></div>
+          <input type="hidden" id="plant-is-outdoor" value="false" />
+        </div>
+        <div class="field">
+          <label for="plant-water-days">Water every (days)</label>
+          <input type="number" id="plant-water-days" name="baseWaterDays" min="1" step="1" placeholder="7" />
+        </div>
+        <div class="field">
+          <label for="plant-notes">Notes (optional)</label>
+          <textarea id="plant-notes" name="notes" rows="2"></textarea>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn--primary">SAVE</button>
+        <button type="button" class="btn btn--ghost" id="plant-cancel-btn">CANCEL</button>
+        <button type="button" class="btn btn--danger" id="plant-delete-btn" hidden style="margin-left:auto;">DELETE</button>
       </div>
     </form>
   </div>

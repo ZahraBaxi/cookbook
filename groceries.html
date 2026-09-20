@@ -20,6 +20,7 @@
       <li><a href="cookbook.html">COOKBOOK</a></li>
       <li><a href="inventory.html">INVENTORY</a></li>
       <li><a href="groceries.html" aria-current="page">GROCERIES</a></li>
+      <li><a href="plants.html">PLANTS</a></li>
       <li><a href="admin.html">ADMIN</a></li>
     </ul>
   </nav>
@@ -41,6 +42,7 @@
     <!-- Read-only view — visible to everyone, no PIN needed. What you'd send
          a family member so they can see what to pick up. -->
     <div id="grocery-readonly-view">
+      <div class="filter-row" id="grocery-readonly-location-filter" role="group" aria-label="Filter by store" style="margin-bottom:1rem;"></div>
       <div id="grocery-readonly-list">
         <div class="loading-row">Loading…</div>
       </div>
@@ -85,6 +87,10 @@
                 <input type="checkbox" id="grocery-item-bulk" name="bulk" />
                 <span>This is in the bulk bin section</span>
               </label>
+            </div>
+            <div class="field field--full">
+              <label for="grocery-item-url">Link <span style="color:var(--color-text-secondary); font-weight:400;">(optional — e.g. a product page)</span></label>
+              <input type="url" id="grocery-item-url" name="url" placeholder="https://…" />
             </div>
           </div>
           <div class="form-actions">
@@ -211,7 +217,7 @@
   </div>
 </div>
 <footer class="site-footer">
-  <div class="shell" data-site-footer>Zahra's Kitchen.</div>
+  <div class="shell" data-site-footer>Zahra's Space.</div>
 </footer>
 
 <script src="https://unpkg.com/parse/dist/parse.min.js"></script>

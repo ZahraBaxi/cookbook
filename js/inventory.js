@@ -7,7 +7,8 @@
  * -----------------------------------------------------------------------
  */
 
-let allItems = [];
+let allItems = []; // Food items only (itemType !== "Appliance")
+let allAppliances = [];
 let activeLocation = "All";
 let invSearchQuery = "";
 let activeShelfFilter = null; // { location, shelf } | null — set by tapping the mini-map
@@ -33,14 +34,18 @@ function shelfOrderFor(location) {
 async function loadInventoryData() {
   const resultsEl = document.getElementById("inventory-results");
   try {
-    [allItems, storageLayouts] = await Promise.all([
+    const [allInventory, layouts] = await Promise.all([
       new Parse.Query(InventoryItemClass).ascending("name").limit(2000).find(),
       loadStorageLayouts(),
     ]);
+    storageLayouts = layouts;
+    allItems = allInventory.filter((i) => (i.get("itemType") || "Food") !== "Appliance");
+    allAppliances = allInventory.filter((i) => i.get("itemType") === "Appliance");
     renderSummary();
     renderMiniMap();
     renderLocationFilters();
     renderInventory();
+    renderApplianceList();
   } catch (err) {
     console.error(err);
     resultsEl.innerHTML = `<div class="empty-state"><p class="empty-state__title">Couldn't load the inventory.</p><p>${escapeHtml(err.message || "Check your connection and try again.")}</p></div>`;
@@ -178,6 +183,7 @@ function renderItemCard(item) {
       </div>
       ${expiration ? `<div class="item-card__expiry">Expires ${formatDate(expiration)}</div>` : ""}
       ${item.get("notes") ? `<div class="item-card__expiry">${escapeHtml(item.get("notes"))}</div>` : ""}
+      <div class="item-card__expiry">Added ${formatDate(item.createdAt)}</div>
     </div>`;
 }
 
@@ -271,9 +277,8 @@ function describeItemForExport(item) {
   return parts.join(" ");
 }
 
-function buildInventoryExportText() {
-  const lines = [`Current kitchen inventory (as of ${new Date().toLocaleDateString()}):`, ""];
-
+function buildFoodExportLines() {
+  const lines = [];
   CONFIG.INVENTORY_LOCATIONS.forEach((location) => {
     const itemsHere = allItems.filter((i) => i.get("location") === location);
     if (!itemsHere.length) return;
@@ -308,12 +313,48 @@ function buildInventoryExportText() {
   if (other.length) {
     lines.push("OTHER");
     other.forEach((item) => lines.push(`  - ${describeItemForExport(item)}`));
+    lines.push("");
+  }
+  return lines;
+}
+
+function buildApplianceExportLines() {
+  if (allAppliances.length === 0) return [];
+  const lines = [];
+  [...allAppliances]
+    .sort((a, b) => (a.get("name") || "").localeCompare(b.get("name") || ""))
+    .forEach((item) => {
+      const label = inventoryItemLabel(item);
+      const location = item.get("location") ? ` [${item.get("location")}]` : "";
+      const notes = item.get("notes") ? ` — ${item.get("notes")}` : "";
+      lines.push(`  - ${label}${location}${notes}`);
+    });
+  lines.push("");
+  return lines;
+}
+
+function buildInventoryExportText() {
+  const includeFood = document.getElementById("copy-include-food").checked;
+  const includeAppliances = document.getElementById("copy-include-appliances").checked;
+  const lines = [`Current kitchen inventory (as of ${new Date().toLocaleDateString()}):`, ""];
+
+  if (includeFood) {
+    lines.push("== FOOD ==", "");
+    lines.push(...buildFoodExportLines());
+  }
+  if (includeAppliances) {
+    lines.push("== APPLIANCES ==", "");
+    lines.push(...buildApplianceExportLines());
   }
 
   return lines.join("\n").trim();
 }
 
 async function handleCopyInventoryClick() {
+  if (!document.getElementById("copy-include-food").checked && !document.getElementById("copy-include-appliances").checked) {
+    showToast("Pick Food, Appliances, or both first.", "error");
+    return;
+  }
   const text = buildInventoryExportText();
   try {
     await navigator.clipboard.writeText(text);
@@ -326,11 +367,67 @@ async function handleCopyInventoryClick() {
   }
 }
 
+/* ---------------------------------------------------------------------
+ * Appliances — a simple flat list, separate from the food/shelf system
+ * entirely (appliances don't live in the Fridge/Freezer/Pantry grid).
+ * ------------------------------------------------------------------- */
+
+function renderApplianceList() {
+  const container = document.getElementById("appliance-results");
+  const query = (document.getElementById("appliance-search").value || "").trim().toLowerCase();
+  const filtered = allAppliances.filter((item) => {
+    if (!query) return true;
+    return [item.get("name"), item.get("variant"), item.get("location"), item.get("notes")].filter(Boolean).join(" ").toLowerCase().includes(query);
+  });
+
+  if (allAppliances.length === 0) {
+    container.innerHTML = `<div class="empty-state"><p class="empty-state__title">No appliances listed yet.</p></div>`;
+    return;
+  }
+  if (filtered.length === 0) {
+    container.innerHTML = `<div class="empty-state"><p class="empty-state__title">Nothing found.</p></div>`;
+    return;
+  }
+
+  container.innerHTML = [...filtered]
+    .sort((a, b) => (a.get("name") || "").localeCompare(b.get("name") || ""))
+    .map(
+      (item) => `
+      <div class="missing-ingredient-row">
+        <div>
+          <div class="missing-ingredient-row__name">${escapeHtml(inventoryItemLabel(item))}</div>
+          <div class="missing-ingredient-row__recipes">${escapeHtml(item.get("location") || "")}${item.get("notes") ? " · " + escapeHtml(item.get("notes")) : ""}</div>
+        </div>
+      </div>`
+    )
+    .join("");
+}
+
+function initInventoryTabs() {
+  const tabFood = document.getElementById("tab-inv-food");
+  const tabAppliances = document.getElementById("tab-inv-appliances");
+  const panelFood = document.getElementById("panel-inv-food");
+  const panelAppliances = document.getElementById("panel-inv-appliances");
+
+  function activate(name) {
+    const isFood = name === "food";
+    tabFood.setAttribute("aria-selected", String(isFood));
+    tabAppliances.setAttribute("aria-selected", String(!isFood));
+    panelFood.hidden = !isFood;
+    panelAppliances.hidden = isFood;
+  }
+
+  tabFood.addEventListener("click", () => activate("food"));
+  tabAppliances.addEventListener("click", () => activate("appliances"));
+}
+
 document.addEventListener("DOMContentLoaded", () => {
+  initInventoryTabs();
   document.getElementById("inventory-search").addEventListener("input", (e) => {
     invSearchQuery = e.target.value.trim();
     renderInventory();
   });
+  document.getElementById("appliance-search").addEventListener("input", renderApplianceList);
   document.getElementById("copy-inventory-btn").addEventListener("click", handleCopyInventoryClick);
   loadInventoryData();
 });

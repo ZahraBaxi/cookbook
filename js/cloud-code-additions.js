@@ -59,6 +59,7 @@ const StorageLayout = Parse.Object.extend("StorageLayout");
 const GrocerySession = Parse.Object.extend("GrocerySession");
 const GroceryItem = Parse.Object.extend("GroceryItem");
 const GroceryLocation = Parse.Object.extend("GroceryLocation");
+const Plant = Parse.Object.extend("Plant");
 
 Parse.Cloud.define("adminLogin", async (request) => {
   const { username, password } = request.params;
@@ -112,7 +113,7 @@ async function requireAdmin(adminToken) {
   return session;
 }
 
-const INVENTORY_FIELDS = ["name", "variant", "category", "location", "shelf", "quantity", "unit", "level", "notes"];
+const INVENTORY_FIELDS = ["name", "variant", "category", "location", "shelf", "quantity", "unit", "level", "notes", "itemType"];
 
 function applyInventoryFields(item, params) {
   INVENTORY_FIELDS.forEach((field) => {
@@ -159,6 +160,7 @@ function applyRecipeFields(recipe, params) {
   if (params.tags !== undefined) recipe.set("tags", params.tags);
   if (params.ingredients !== undefined) recipe.set("ingredients", params.ingredients);
   if (params.requiresRecipes !== undefined) recipe.set("requiresRecipes", params.requiresRecipes);
+  if (params.requiredAppliances !== undefined) recipe.set("requiredAppliances", params.requiredAppliances);
 }
 
 Parse.Cloud.define("adminCreateRecipe", async (request) => {
@@ -254,7 +256,7 @@ async function requireGroceryAccess(groceryToken) {
   return session;
 }
 
-const GROCERY_ITEM_FIELDS = ["name", "category", "location", "bulk", "status"];
+const GROCERY_ITEM_FIELDS = ["name", "category", "location", "bulk", "status", "url"];
 
 function applyGroceryItemFields(item, params) {
   GROCERY_ITEM_FIELDS.forEach((field) => {
@@ -361,5 +363,49 @@ Parse.Cloud.define("adminDeleteGroceryLocation", async (request) => {
   const query = new Parse.Query(GroceryLocation);
   const location = await query.get(request.params.id, { useMasterKey: true });
   await location.destroy({ useMasterKey: true });
+  return { success: true };
+});
+
+/* ============================================================
+   Plants — location + watering schedule. Admin-only (not shared like
+   groceries); the weather-based schedule adjustment itself happens
+   client-side (Open-Meteo, no key needed), Cloud Code just stores the
+   plant's own data (name, location, indoor/outdoor, baseline watering
+   frequency, last watered date, notes).
+   ============================================================ */
+
+Parse.Cloud.define("adminSavePlant", async (request) => {
+  await requireAdmin(request.params.adminToken);
+  const { id, name, location, isOutdoor, baseWaterDays, notes } = request.params;
+  let plant;
+  if (id) {
+    plant = await new Parse.Query(Plant).get(id, { useMasterKey: true });
+  } else {
+    plant = new Plant();
+  }
+  if (name !== undefined) plant.set("name", name);
+  if (location !== undefined) plant.set("location", location);
+  if (isOutdoor !== undefined) plant.set("isOutdoor", !!isOutdoor);
+  if (baseWaterDays !== undefined) plant.set("baseWaterDays", Number(baseWaterDays) || 7);
+  if (notes !== undefined) plant.set("notes", notes);
+  if (!plant.get("lastWatered")) plant.set("lastWatered", new Date());
+  await plant.save(null, { useMasterKey: true });
+  return plant.toJSON();
+});
+
+Parse.Cloud.define("adminLogPlantWatering", async (request) => {
+  await requireAdmin(request.params.adminToken);
+  const query = new Parse.Query(Plant);
+  const plant = await query.get(request.params.id, { useMasterKey: true });
+  plant.set("lastWatered", new Date());
+  await plant.save(null, { useMasterKey: true });
+  return plant.toJSON();
+});
+
+Parse.Cloud.define("adminDeletePlant", async (request) => {
+  await requireAdmin(request.params.adminToken);
+  const query = new Parse.Query(Plant);
+  const plant = await query.get(request.params.id, { useMasterKey: true });
+  await plant.destroy({ useMasterKey: true });
   return { success: true };
 });
