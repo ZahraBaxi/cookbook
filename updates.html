@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Updates — THE KITCHEN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="nav shell" aria-label="Primary">
+    <a class="nav-brand" href="index.html" data-site-title>THE KITCHEN</a>
+    <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false"><span></span></button>
+    <ul class="nav-links">
+      <li><a href="cookbook.html">COOKBOOK</a></li>
+      <li><a href="inventory.html">INVENTORY</a></li>
+      <li><a href="groceries.html">GROCERIES</a></li>
+      <li><a href="plants.html">PLANTS</a></li>
+      <li><a href="admin.html">ADMIN</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main>
+  <div class="shell">
+    <div class="page-header">
+      <div class="page-header__eyebrow">Changelog</div>
+      <h1>UPDATES</h1>
+      <p class="page-header__subtitle">What's changed, version by version.</p>
+    </div>
+
+    <div id="updates-list"></div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="shell" data-site-footer>Zahra's Space.</div>
+</footer>
+
+<script src="js/config.js"></script>
+<script src="js/changelog.js"></script>
+<script src="js/utils.js"></script>
+<script>
+  document.getElementById("updates-list").innerHTML = CHANGELOG.map(function(entry) {
+    var dateLabel = new Date(entry.date + "T00:00:00").toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+    var items = entry.changes.map(function(c) { return "<li style=\"margin-bottom:0.4rem;\">" + c + "</li>"; }).join("");
+    return "<div class=\"admin-missing-section\"><div class=\"admin-missing-section__title\">" + entry.version + " — " + dateLabel + "</div><ul style=\"padding:1rem 1.5rem 1.25rem;\">" + items + "</ul></div>";
+  }).join("");
+</script>
+</body>
+</html>

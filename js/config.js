@@ -19,6 +19,7 @@ const CONFIG = {
   COOKBOOK_SUBTITLE: "Recipes from my kitchen.",
   INVENTORY_SUBTITLE: "What's in the kitchen.",
   MAIN_SITE_URL: "https://zahrabaxi.com",
+  APP_VERSION: "v1.0.0",
 
   // Plants — used to fetch recent weather (Open-Meteo, free, no API key)
   // to nudge outdoor plants' watering schedule. Change to your own

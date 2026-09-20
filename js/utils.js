@@ -511,7 +511,7 @@ function applySiteCopy() {
   document.querySelectorAll("[data-home-subtitle]").forEach((el) => (el.textContent = CONFIG.HOME_SUBTITLE));
 
   document.querySelectorAll("[data-site-footer]").forEach((el) => {
-    el.innerHTML = `${escapeHtml(CONFIG.SITE_TITLE)}. &copy; 2026, made with &lt;3 by <a class="footer-link" href="${CONFIG.MAIN_SITE_URL}" target="_blank" rel="noopener">zahra</a> using html, css, js, and sparkle dust.`;
+    el.innerHTML = `&copy; 2026 ${escapeHtml(CONFIG.SITE_TITLE)}. Made with &lt;3 by <a class="footer-link" href="${CONFIG.MAIN_SITE_URL}" target="_blank" rel="noopener">zahra</a> using html, css, js, and sparkle dust. · <a class="footer-link" href="bug.html">Report a bug</a> · <a class="footer-link" href="updates.html">${escapeHtml(CONFIG.APP_VERSION)}</a>`;
   });
 }
 

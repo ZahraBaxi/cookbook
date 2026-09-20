@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Report a Bug — THE KITCHEN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="nav shell" aria-label="Primary">
+    <a class="nav-brand" href="index.html" data-site-title>THE KITCHEN</a>
+    <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false"><span></span></button>
+    <ul class="nav-links">
+      <li><a href="cookbook.html">COOKBOOK</a></li>
+      <li><a href="inventory.html">INVENTORY</a></li>
+      <li><a href="groceries.html">GROCERIES</a></li>
+      <li><a href="plants.html">PLANTS</a></li>
+      <li><a href="admin.html">ADMIN</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main>
+  <div class="shell" style="max-width:640px;">
+    <div class="page-header">
+      <div class="page-header__eyebrow">Something broken?</div>
+      <h1>REPORT A BUG</h1>
+      <p class="page-header__subtitle">No login needed — this goes straight into the database for review.</p>
+    </div>
+
+    <form id="bug-form" novalidate>
+      <div class="form-grid">
+        <div class="field field--full">
+          <label for="bug-description">What happened? <span style="color:var(--color-text-secondary); font-weight:400;">(required)</span></label>
+          <textarea id="bug-description" name="description" rows="5" required placeholder="What were you doing, what did you expect, what actually happened?"></textarea>
+        </div>
+        <div class="field">
+          <label for="bug-page">Which page? <span style="color:var(--color-text-secondary); font-weight:400;">(optional)</span></label>
+          <input type="text" id="bug-page" name="page" placeholder="e.g. Groceries, Admin → Layout" />
+        </div>
+        <div class="field">
+          <label for="bug-severity">How bad is it?</label>
+          <select id="bug-severity" name="severity">
+            <option value="Minor">Minor — annoying, but works</option>
+            <option value="Major">Major — a feature doesn't work</option>
+            <option value="Blocker">Blocker — can't use the site</option>
+          </select>
+        </div>
+        <div class="field field--full">
+          <label for="bug-name">Your name <span style="color:var(--color-text-secondary); font-weight:400;">(optional)</span></label>
+          <input type="text" id="bug-name" name="name" placeholder="So it's clear who found it" />
+        </div>
+      </div>
+      <p class="admin-error" id="bug-error" role="alert">Please describe the bug first.</p>
+      <div class="form-actions">
+        <button type="submit" class="btn btn--primary" id="bug-submit-btn">SUBMIT</button>
+      </div>
+    </form>
+
+    <div id="bug-success" hidden>
+      <p class="admin-missing-empty">Thanks — that's been logged. 🐛</p>
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="shell" data-site-footer>Zahra's Space.</div>
+</footer>
+
+<script src="https://unpkg.com/parse/dist/parse.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/parse.js"></script>
+<script src="js/utils.js"></script>
+<script>
+  document.getElementById("bug-form").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    const description = document.getElementById("bug-description").value.trim();
+    const errorEl = document.getElementById("bug-error");
+    errorEl.classList.remove("admin-error--visible");
+    if (!description) {
+      errorEl.classList.add("admin-error--visible");
+      return;
+    }
+
+    const submitBtn = document.getElementById("bug-submit-btn");
+    submitBtn.disabled = true;
+    submitBtn.textContent = "SUBMITTING…";
+    try {
+      await Parse.Cloud.run("createBugReport", {
+        description,
+        page: document.getElementById("bug-page").value.trim(),
+        severity: document.getElementById("bug-severity").value,
+        name: document.getElementById("bug-name").value.trim(),
+        appVersion: CONFIG.APP_VERSION,
+      });
+      document.getElementById("bug-form").hidden = true;
+      document.getElementById("bug-success").hidden = false;
+    } catch (err) {
+      console.error(err);
+      showToast(err.message || "Couldn't submit — try again?", "error");
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "SUBMIT";
+    }
+  });
+</script>
+</body>
+</html>

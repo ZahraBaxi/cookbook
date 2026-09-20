@@ -80,6 +80,7 @@ async function handlePinSubmit(e) {
       setGrocerySession(result.token);
       document.getElementById("grocery-pin-input").value = "";
       showUnlockedView();
+      await offerToPromoteLocalChecks();
     } else {
       throw new Error("No token returned");
     }
@@ -332,6 +333,65 @@ function copyStoreLink(location) {
 }
 
 /* ---------------------------------------------------------------------
+ * Local "mental checklist" for anyone viewing without the PIN — lets a
+ * family member physically shopping check things off as they go,
+ * purely client-side (localStorage, this browser only, never synced).
+ * If they later unlock with the PIN, they're offered a one-tap way to
+ * move whatever they checked into the real Checkout pile.
+ * ------------------------------------------------------------------- */
+
+const LOCAL_CHECKS_KEY = "kitchen_grocery_local_checks";
+
+function getLocalChecks() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(LOCAL_CHECKS_KEY)) || []);
+  } catch (err) {
+    return new Set();
+  }
+}
+
+function saveLocalChecks(set) {
+  localStorage.setItem(LOCAL_CHECKS_KEY, JSON.stringify([...set]));
+}
+
+function toggleLocalCheck(id) {
+  const checks = getLocalChecks();
+  if (checks.has(id)) checks.delete(id);
+  else checks.add(id);
+  saveLocalChecks(checks);
+  renderReadonlyList();
+}
+
+/**
+ * Called right after a successful PIN unlock. If the person had locally
+ * checked anything off while browsing without the PIN, offer to move
+ * those into the real Checkout pile instead of silently losing the
+ * selection.
+ */
+async function offerToPromoteLocalChecks() {
+  const checks = getLocalChecks();
+  const validIds = [...checks].filter((id) => activeGroceryItems().some((i) => i.id === id));
+  if (validIds.length === 0) return;
+
+  const names = validIds.map((id) => groceryItems.find((i) => i.id === id)).filter(Boolean).map((i) => i.get("name"));
+  if (!window.confirm(`Add your ${validIds.length} selected item${validIds.length === 1 ? "" : "s"} (${names.join(", ")}) to checkout?`)) {
+    saveLocalChecks(new Set());
+    return;
+  }
+
+  for (const id of validIds) {
+    try {
+      await runGroceryCloud("groceryUpdateItem", { id, status: "checkedOut" });
+    } catch (err) {
+      console.error(err);
+    }
+  }
+  saveLocalChecks(new Set());
+  showToast(`Moved ${validIds.length} item${validIds.length === 1 ? "" : "s"} to checkout.`);
+  await loadGroceryData();
+}
+
+/* ---------------------------------------------------------------------
  * Read-only view — visible to everyone, no PIN required. Only shows
  * items still actively needed (not yet bought/checked off).
  * ------------------------------------------------------------------- */
@@ -339,6 +399,7 @@ function copyStoreLink(location) {
 function renderReadonlyList() {
   const container = document.getElementById("grocery-readonly-list");
   const allActive = activeGroceryItems();
+  const localChecks = getLocalChecks();
 
   renderLocationBubbleFilter(
     "grocery-readonly-location-filter",
@@ -369,15 +430,17 @@ function renderReadonlyList() {
   container.innerHTML = sections
     .map(([location, locationItems]) => {
       const rows = locationItems
-        .map(
-          (item) => `
-        <div class="missing-ingredient-row">
-          <div>
-            <div class="missing-ingredient-row__name">${itemDisplayLine(item)}</div>
-            <div class="missing-ingredient-row__recipes">${escapeHtml(item.get("category") || "")}</div>
-          </div>
-        </div>`
-        )
+        .map((item) => {
+          const checked = localChecks.has(item.id);
+          return `
+        <label class="missing-ingredient-row" style="cursor:pointer;">
+          <span class="checkbox-field" style="gap:0.75rem;">
+            <input type="checkbox" data-local-check="${item.id}" ${checked ? "checked" : ""} />
+            <span class="missing-ingredient-row__name" style="${checked ? "text-decoration:line-through; color:var(--color-text-secondary);" : ""}">${itemDisplayLine(item)}</span>
+          </span>
+          <span class="missing-ingredient-row__recipes">${escapeHtml(item.get("category") || "")}</span>
+        </label>`;
+        })
         .join("");
       const shareBtn = location ? `<button type="button" class="btn btn--ghost btn--small" data-copy-store-link="${escapeHtml(location)}">🔗 SHARE THIS STORE</button>` : "";
       return `
@@ -393,6 +456,10 @@ function renderReadonlyList() {
 
   container.querySelectorAll("[data-copy-store-link]").forEach((btn) => {
     btn.addEventListener("click", () => copyStoreLink(btn.getAttribute("data-copy-store-link")));
+  });
+
+  container.querySelectorAll("[data-local-check]").forEach((cb) => {
+    cb.addEventListener("change", () => toggleLocalCheck(cb.getAttribute("data-local-check")));
   });
 }
 

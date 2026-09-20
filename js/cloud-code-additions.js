@@ -60,6 +60,7 @@ const GrocerySession = Parse.Object.extend("GrocerySession");
 const GroceryItem = Parse.Object.extend("GroceryItem");
 const GroceryLocation = Parse.Object.extend("GroceryLocation");
 const Plant = Parse.Object.extend("Plant");
+const BugReport = Parse.Object.extend("BugReport");
 
 Parse.Cloud.define("adminLogin", async (request) => {
   const { username, password } = request.params;
@@ -407,5 +408,28 @@ Parse.Cloud.define("adminDeletePlant", async (request) => {
   const query = new Parse.Query(Plant);
   const plant = await query.get(request.params.id, { useMasterKey: true });
   await plant.destroy({ useMasterKey: true });
+  return { success: true };
+});
+
+/**
+ * Bug reports (bug.html) — deliberately NOT gated by any PIN or login,
+ * same as a public contact form: anyone should be able to report a
+ * problem without needing credentials. There's no public "read" of these
+ * anywhere in the app — check them in the Back4App dashboard directly
+ * (Core > Browser > BugReport), or ask Claude to build an Admin tab for
+ * them if you want that later.
+ */
+Parse.Cloud.define("createBugReport", async (request) => {
+  const { name, page, severity, description } = request.params;
+  if (!description || !description.trim()) {
+    throw new Parse.Error(Parse.Error.INVALID_QUERY, "Please describe the bug.");
+  }
+  const report = new BugReport();
+  report.set("name", (name || "").trim());
+  report.set("page", (page || "").trim());
+  report.set("severity", severity || "Minor");
+  report.set("description", description.trim());
+  report.set("appVersion", request.params.appVersion || "");
+  await report.save(null, { useMasterKey: true });
   return { success: true };
 });
