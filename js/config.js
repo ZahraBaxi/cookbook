@@ -19,7 +19,7 @@ const CONFIG = {
   COOKBOOK_SUBTITLE: "Recipes from my kitchen.",
   INVENTORY_SUBTITLE: "What's in the kitchen.",
   MAIN_SITE_URL: "https://zahrabaxi.com",
-  APP_VERSION: "v1.0.0",
+  APP_VERSION: "v1.1.0",
 
   // Plants — used to fetch recent weather (Open-Meteo, free, no API key)
   // to nudge outdoor plants' watering schedule. Change to your own
@@ -41,6 +41,7 @@ const CONFIG = {
   ADMIN_TOKEN_KEY: "kitchen_admin_token",
   ADMIN_USER_KEY: "kitchen_admin_user",
   GROCERY_TOKEN_KEY: "kitchen_grocery_token",
+  INVENTORY_TOKEN_KEY: "kitchen_inventory_token",
 
   // Controlled vocabulary. Recipes can still use free-form categories/tags —
   // this list only drives the Inventory admin dropdowns and filter chips.

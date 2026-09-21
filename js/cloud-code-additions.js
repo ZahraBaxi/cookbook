@@ -52,6 +52,9 @@ const SESSION_TTL_MS = 1000 * 60 * 60 * 12; // 12 hours
 const GROCERY_PIN = "1234"; // change this to whatever you want people to enter
 const GROCERY_SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days — low-stakes, meant to stay unlocked on your phone
 
+const INVENTORY_PIN = "5678"; // change this — deliberately a DIFFERENT pin than groceries, since this touches real stock data
+const INVENTORY_SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days — same reasoning as groceries: convenience for repeated quick edits
+
 const AdminSession = Parse.Object.extend("AdminSession");
 const InventoryItem = Parse.Object.extend("InventoryItem");
 const Recipe = Parse.Object.extend("Recipe");
@@ -61,6 +64,7 @@ const GroceryItem = Parse.Object.extend("GroceryItem");
 const GroceryLocation = Parse.Object.extend("GroceryLocation");
 const Plant = Parse.Object.extend("Plant");
 const BugReport = Parse.Object.extend("BugReport");
+const InventorySession = Parse.Object.extend("InventorySession");
 
 Parse.Cloud.define("adminLogin", async (request) => {
   const { username, password } = request.params;
@@ -431,5 +435,69 @@ Parse.Cloud.define("createBugReport", async (request) => {
   report.set("description", description.trim());
   report.set("appVersion", request.params.appVersion || "");
   await report.save(null, { useMasterKey: true });
+  return { success: true };
+});
+
+/* ============================================================
+   Inventory quick-edit — PIN-gated, separate from both admin login and
+   the grocery PIN. Meant for scanning a QR code on a shelf and fixing
+   that one item's quantity/level/location in a couple of taps, without
+   a full admin session.
+   ============================================================ */
+
+Parse.Cloud.define("inventoryLogin", async (request) => {
+  const { pin } = request.params;
+  if (pin !== INVENTORY_PIN) {
+    throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, "Incorrect PIN.");
+  }
+  const token = "inventory-" + Date.now() + "-" + Math.random().toString(36).slice(2, 10);
+  const session = new InventorySession();
+  session.set("token", token);
+  session.set("expiresAt", new Date(Date.now() + INVENTORY_SESSION_TTL_MS));
+  await session.save(null, { useMasterKey: true });
+  return { token };
+});
+
+async function requireInventoryAccess(inventoryToken) {
+  if (!inventoryToken) {
+    throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, "Missing inventory access token.");
+  }
+  const query = new Parse.Query(InventorySession);
+  query.equalTo("token", inventoryToken);
+  const session = await query.first({ useMasterKey: true });
+  if (!session) {
+    throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, "Invalid inventory session.");
+  }
+  if (session.get("expiresAt") < new Date()) {
+    await session.destroy({ useMasterKey: true });
+    throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, "Inventory session expired. Please enter the PIN again.");
+  }
+  return session;
+}
+
+/**
+ * Deliberately narrower than adminUpdateInventoryItem — only the fields
+ * a quick shelf-side edit actually needs (quantity, unit, level,
+ * location, shelf, notes). Renaming an item, changing its category, or
+ * switching Food/Appliance still requires full admin login.
+ */
+const INVENTORY_QUICK_EDIT_FIELDS = ["quantity", "unit", "level", "location", "shelf", "notes"];
+
+Parse.Cloud.define("inventoryQuickUpdateItem", async (request) => {
+  await requireInventoryAccess(request.params.inventoryToken);
+  const query = new Parse.Query(InventoryItem);
+  const item = await query.get(request.params.id, { useMasterKey: true });
+  INVENTORY_QUICK_EDIT_FIELDS.forEach((field) => {
+    if (request.params[field] !== undefined) item.set(field, request.params[field]);
+  });
+  await item.save(null, { useMasterKey: true });
+  return item.toJSON();
+});
+
+Parse.Cloud.define("inventoryQuickDeleteItem", async (request) => {
+  await requireInventoryAccess(request.params.inventoryToken);
+  const query = new Parse.Query(InventoryItem);
+  const item = await query.get(request.params.id, { useMasterKey: true });
+  await item.destroy({ useMasterKey: true });
   return { success: true };
 });

@@ -28,10 +28,16 @@
 
 <main>
   <div class="shell">
-    <div class="page-header">
-      <div class="page-header__eyebrow">Pantry, fridge & freezer</div>
-      <h1>INVENTORY</h1>
-      <p class="page-header__subtitle">What's in the kitchen.</p>
+    <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-end; gap:1rem; flex-wrap:wrap;">
+      <div>
+        <div class="page-header__eyebrow">Pantry, fridge & freezer</div>
+        <h1>INVENTORY</h1>
+        <p class="page-header__subtitle">What's in the kitchen.</p>
+      </div>
+      <div>
+        <button type="button" class="btn btn--ghost btn--small" id="inventory-unlock-toggle-btn">🔓 UNLOCK TO EDIT</button>
+        <button type="button" class="btn btn--ghost btn--small" id="inventory-lock-btn" hidden>🔒 LOCK</button>
+      </div>
     </div>
 
     <div class="toolbar toolbar--secondary" style="align-items:center;">
@@ -87,6 +93,61 @@
     </div>
   </div>
 </main>
+
+<!-- PIN modal — opened by "Unlock to edit". Browsing/searching never needs this. -->
+<div class="modal-overlay" id="inventory-pin-modal-overlay" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="inventory-pin-modal-title" style="max-width:340px;">
+    <button class="modal__close" id="inventory-pin-modal-close" aria-label="Close">&times;</button>
+    <h2 id="inventory-pin-modal-title">Unlock to edit</h2>
+    <form id="inventory-pin-form" novalidate>
+      <div class="field" style="margin-bottom:1rem;">
+        <label for="inventory-pin-input" class="visually-hidden">PIN</label>
+        <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" id="inventory-pin-input" autocomplete="off" placeholder="PIN" style="letter-spacing:0.4em; font-size:1.4rem; text-align:center;" />
+      </div>
+      <p class="admin-error" id="inventory-pin-error" role="alert">Incorrect PIN.</p>
+      <div class="form-actions">
+        <button type="submit" class="btn btn--primary" style="width:100%;">UNLOCK</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Quick-edit modal — quantity/level/location/shelf, or mark finished. Deliberately
+     narrower than the full Admin item form: this is for a fast shelf-side fix. -->
+<div class="modal-overlay" id="quick-edit-modal-overlay" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="quick-edit-modal-title">
+    <button class="modal__close" id="quick-edit-modal-close" aria-label="Close">&times;</button>
+    <h2 id="quick-edit-modal-title">Quick edit</h2>
+    <form id="quick-edit-form" novalidate>
+      <div class="form-grid">
+        <div class="field">
+          <label for="quick-edit-quantity">Quantity</label>
+          <input type="number" id="quick-edit-quantity" min="0" step="0.1" />
+        </div>
+        <div class="field">
+          <label for="quick-edit-unit">Unit</label>
+          <input type="text" id="quick-edit-unit" placeholder="bottle, g, cup…" />
+        </div>
+        <div class="field field--full">
+          <label>Level</label>
+          <div class="level-selector" id="quick-edit-level-selector"></div>
+        </div>
+        <div class="field">
+          <label for="quick-edit-location">Location</label>
+          <select id="quick-edit-location"></select>
+        </div>
+        <div class="field">
+          <label for="quick-edit-shelf">Shelf</label>
+          <select id="quick-edit-shelf"></select>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn--primary">SAVE</button>
+        <button type="button" class="btn btn--danger" id="quick-edit-finished-btn" style="margin-left:auto;">FINISHED (REMOVE)</button>
+      </div>
+    </form>
+  </div>
+</div>
 
 <footer class="site-footer">
   <div class="shell" data-site-footer>Zahra's Space.</div>

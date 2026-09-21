@@ -70,3 +70,31 @@ async function runGroceryCloud(name, params = {}) {
   const token = getGroceryToken();
   return Parse.Cloud.run(name, { ...params, groceryToken: token });
 }
+
+/**
+ * Same idea again, this time for quick-editing Inventory items (update
+ * quantity/level, move location/shelf, or delete when finished) without
+ * a full admin login — meant for scanning a QR code on a shelf and
+ * fixing that one item's status in a couple of taps. Deliberately a
+ * SEPARATE PIN from groceries, since this touches real stock data.
+ */
+function getInventoryToken() {
+  return localStorage.getItem(CONFIG.INVENTORY_TOKEN_KEY) || null;
+}
+
+function isInventoryUnlocked() {
+  return !!getInventoryToken();
+}
+
+function setInventorySession(token) {
+  localStorage.setItem(CONFIG.INVENTORY_TOKEN_KEY, token);
+}
+
+function clearInventorySession() {
+  localStorage.removeItem(CONFIG.INVENTORY_TOKEN_KEY);
+}
+
+async function runInventoryCloud(name, params = {}) {
+  const token = getInventoryToken();
+  return Parse.Cloud.run(name, { ...params, inventoryToken: token });
+}

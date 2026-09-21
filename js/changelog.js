@@ -9,6 +9,14 @@
 
 const CHANGELOG = [
   {
+    version: "v1.1.0",
+    date: "2026-09-20",
+    changes: [
+      "Added: quick-edit for Inventory items via a separate PIN — update quantity/level/location/shelf or mark an item finished in a couple of taps, e.g. after scanning a QR code taped to a shelf.",
+      "Added: inventory.html?item=&lt;id&gt; deep-links straight to that item's quick-edit modal.",
+    ],
+  },
+  {
     version: "v1.0.0",
     date: "2026-09-20",
     changes: [

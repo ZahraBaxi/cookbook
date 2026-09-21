@@ -184,6 +184,7 @@ function renderItemCard(item) {
       ${expiration ? `<div class="item-card__expiry">Expires ${formatDate(expiration)}</div>` : ""}
       ${item.get("notes") ? `<div class="item-card__expiry">${escapeHtml(item.get("notes"))}</div>` : ""}
       <div class="item-card__expiry">Added ${formatDate(item.createdAt)}</div>
+      <button type="button" class="btn btn--ghost btn--small" data-quick-edit="${item.id}" style="margin-top:0.6rem; width:100%;" ${isInventoryUnlocked() ? "" : "hidden"}>EDIT</button>
     </div>`;
 }
 
@@ -260,6 +261,10 @@ function renderInventory() {
       renderInventory();
     });
   }
+
+  resultsEl.querySelectorAll("[data-quick-edit]").forEach((btn) => {
+    btn.addEventListener("click", () => openQuickEditModal(btn.getAttribute("data-quick-edit")));
+  });
 }
 
 /* ---------------------------------------------------------------------
@@ -421,6 +426,182 @@ function initInventoryTabs() {
   tabAppliances.addEventListener("click", () => activate("appliances"));
 }
 
+/* ---------------------------------------------------------------------
+ * Quick-edit via PIN — separate from Admin login, meant for scanning a
+ * QR code taped to a shelf/bin and fixing that one item's quantity/
+ * level/location in a couple of taps. Browsing/searching never needs
+ * this; it only gates the EDIT buttons and the quick-edit modal itself.
+ * ------------------------------------------------------------------- */
+
+let pendingQrItemId = null; // set from ?item= on load if we're locked, opened once unlocked
+
+function updateInventoryLockUI() {
+  const unlocked = isInventoryUnlocked();
+  document.getElementById("inventory-unlock-toggle-btn").hidden = unlocked;
+  document.getElementById("inventory-lock-btn").hidden = !unlocked;
+}
+
+function handleInventoryUnlockToggleClick() {
+  document.getElementById("inventory-pin-error").classList.remove("admin-error--visible");
+  document.getElementById("inventory-pin-input").value = "";
+  openModal(document.getElementById("inventory-pin-modal-overlay"));
+  document.getElementById("inventory-pin-input").focus();
+}
+
+async function handleInventoryPinSubmit(e) {
+  e.preventDefault();
+  const pin = document.getElementById("inventory-pin-input").value.trim();
+  const errorEl = document.getElementById("inventory-pin-error");
+  errorEl.classList.remove("admin-error--visible");
+
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+  submitBtn.textContent = "CHECKING…";
+  try {
+    const result = await Parse.Cloud.run("inventoryLogin", { pin });
+    if (!result || !result.token) throw new Error("No token returned");
+    setInventorySession(result.token);
+    document.getElementById("inventory-pin-input").value = "";
+    closeModal(document.getElementById("inventory-pin-modal-overlay"));
+    updateInventoryLockUI();
+    renderInventory();
+    if (pendingQrItemId) {
+      const id = pendingQrItemId;
+      pendingQrItemId = null;
+      openQuickEditModal(id);
+    }
+  } catch (err) {
+    errorEl.classList.add("admin-error--visible");
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = "UNLOCK";
+  }
+}
+
+function handleInventoryLockClick() {
+  clearInventorySession();
+  updateInventoryLockUI();
+  renderInventory();
+  showToast("Locked.");
+}
+
+function handleInventoryAuthError(err) {
+  if (err && err.code === Parse.Error.INVALID_SESSION_TOKEN) {
+    clearInventorySession();
+    updateInventoryLockUI();
+    showToast("Session expired — unlock with the PIN again.", "error");
+    return true;
+  }
+  return false;
+}
+
+let quickEditItemId = null;
+
+function populateQuickEditLocationSelect(currentLocation) {
+  const select = document.getElementById("quick-edit-location");
+  select.innerHTML = CONFIG.INVENTORY_LOCATIONS.map((loc) => `<option value="${loc}">${loc}</option>`).join("");
+  select.value = currentLocation || CONFIG.INVENTORY_LOCATIONS[0];
+}
+
+function populateQuickEditShelfSelect(location, currentShelf) {
+  const select = document.getElementById("quick-edit-shelf");
+  const shelves = shelfOrderFor(location);
+  const options = ["", ...shelves];
+  select.innerHTML = options.map((s) => `<option value="${escapeHtml(s)}">${s ? escapeHtml(s) : "No specific shelf"}</option>`).join("");
+  select.value = shelves.includes(currentShelf) ? currentShelf : "";
+}
+
+function renderQuickEditLevelSelector(selected) {
+  const container = document.getElementById("quick-edit-level-selector");
+  container.innerHTML = "";
+  CONFIG.LEVELS.forEach((level) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "filter-chip";
+    btn.textContent = level.toUpperCase();
+    btn.dataset.level = level;
+    btn.setAttribute("aria-pressed", String(level === selected));
+    btn.addEventListener("click", () => {
+      container.querySelectorAll(".filter-chip").forEach((c) => c.setAttribute("aria-pressed", "false"));
+      btn.setAttribute("aria-pressed", "true");
+    });
+    container.appendChild(btn);
+  });
+}
+
+function openQuickEditModal(itemId) {
+  if (!isInventoryUnlocked()) {
+    pendingQrItemId = itemId;
+    handleInventoryUnlockToggleClick();
+    return;
+  }
+  const item = allItems.find((i) => i.id === itemId);
+  if (!item) return;
+
+  quickEditItemId = itemId;
+  document.getElementById("quick-edit-modal-title").textContent = inventoryItemLabel(item);
+  document.getElementById("quick-edit-quantity").value = item.get("quantity") ?? "";
+  document.getElementById("quick-edit-unit").value = item.get("unit") || "";
+  renderQuickEditLevelSelector(item.get("level") || "Full");
+  populateQuickEditLocationSelect(item.get("location"));
+  populateQuickEditShelfSelect(item.get("location") || CONFIG.INVENTORY_LOCATIONS[0], item.get("shelf"));
+
+  document.getElementById("quick-edit-location").onchange = () => {
+    populateQuickEditShelfSelect(document.getElementById("quick-edit-location").value, "");
+  };
+
+  openModal(document.getElementById("quick-edit-modal-overlay"));
+}
+
+async function handleQuickEditFormSubmit(e) {
+  e.preventDefault();
+  if (!quickEditItemId) return;
+
+  const levelBtn = document.querySelector("#quick-edit-level-selector .filter-chip[aria-pressed='true']");
+  const payload = {
+    id: quickEditItemId,
+    quantity: parseFloat(document.getElementById("quick-edit-quantity").value) || 0,
+    unit: document.getElementById("quick-edit-unit").value.trim(),
+    level: levelBtn ? levelBtn.dataset.level : "Full",
+    location: document.getElementById("quick-edit-location").value,
+    shelf: document.getElementById("quick-edit-shelf").value,
+  };
+
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+  submitBtn.textContent = "SAVING…";
+  try {
+    await runInventoryCloud("inventoryQuickUpdateItem", payload);
+    closeModal(document.getElementById("quick-edit-modal-overlay"));
+    showToast("Saved.");
+    quickEditItemId = null;
+    await loadInventoryData();
+  } catch (err) {
+    console.error(err);
+    if (!handleInventoryAuthError(err)) showToast(err.message || "Couldn't save.", "error");
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = "SAVE";
+  }
+}
+
+async function handleQuickEditFinishedClick() {
+  if (!quickEditItemId) return;
+  const item = allItems.find((i) => i.id === quickEditItemId);
+  if (!window.confirm(`Remove "${item ? inventoryItemLabel(item) : "this item"}" from Inventory? This can't be undone.`)) return;
+
+  try {
+    await runInventoryCloud("inventoryQuickDeleteItem", { id: quickEditItemId });
+    closeModal(document.getElementById("quick-edit-modal-overlay"));
+    showToast("Removed.");
+    quickEditItemId = null;
+    await loadInventoryData();
+  } catch (err) {
+    console.error(err);
+    if (!handleInventoryAuthError(err)) showToast(err.message || "Couldn't remove.", "error");
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   initInventoryTabs();
   document.getElementById("inventory-search").addEventListener("input", (e) => {
@@ -429,5 +610,23 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   document.getElementById("appliance-search").addEventListener("input", renderApplianceList);
   document.getElementById("copy-inventory-btn").addEventListener("click", handleCopyInventoryClick);
-  loadInventoryData();
+
+  document.getElementById("inventory-unlock-toggle-btn").addEventListener("click", handleInventoryUnlockToggleClick);
+  document.getElementById("inventory-pin-modal-close").addEventListener("click", () => closeModal(document.getElementById("inventory-pin-modal-overlay")));
+  document.getElementById("inventory-pin-form").addEventListener("submit", handleInventoryPinSubmit);
+  document.getElementById("inventory-lock-btn").addEventListener("click", handleInventoryLockClick);
+  updateInventoryLockUI();
+
+  document.getElementById("quick-edit-form").addEventListener("submit", handleQuickEditFormSubmit);
+  document.getElementById("quick-edit-modal-close").addEventListener("click", () => closeModal(document.getElementById("quick-edit-modal-overlay")));
+  document.getElementById("quick-edit-finished-btn").addEventListener("click", handleQuickEditFinishedClick);
+
+  // A link like inventory.html?item=<id> (e.g. from a QR code taped to a
+  // shelf) opens straight to that item's quick-edit modal once unlocked;
+  // if locked, it prompts for the PIN first and opens it right after.
+  const itemParam = new URLSearchParams(window.location.search).get("item");
+
+  loadInventoryData().then(() => {
+    if (itemParam) openQuickEditModal(itemParam);
+  });
 });
