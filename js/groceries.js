@@ -229,7 +229,7 @@ function renderLowStockList() {
           <div class="missing-ingredient-row__name">${escapeHtml(inventoryItemLabel(item))} <span class="missing-ingredient-row__tag">${escapeHtml((item.get("level") || "").toUpperCase())}</span></div>
           <div class="missing-ingredient-row__recipes">${escapeHtml([item.get("location"), item.get("shelf")].filter(Boolean).join(" · "))}</div>
         </div>
-        <div style="display:flex; gap:0.5rem;">
+        <div style="display:flex; flex-wrap:wrap; gap:0.5rem;">
           <button type="button" class="btn btn--ghost btn--small" data-finished-item="${item.id}">FINISHED</button>
           <button type="button" class="btn btn--small btn--primary" data-quick-add="${item.id}">+ ADD TO LIST</button>
         </div>
@@ -509,7 +509,7 @@ function renderAddList() {
             <div class="missing-ingredient-row__name">${itemDisplayLine(item)}</div>
             <div class="missing-ingredient-row__recipes">${escapeHtml(item.get("category") || "")}</div>
           </div>
-          <div style="display:flex; gap:0.5rem;">
+          <div style="display:flex; flex-wrap:wrap; gap:0.5rem;">
             <button type="button" class="btn btn--ghost btn--small" data-edit-item="${item.id}">EDIT</button>
             <button type="button" class="btn btn--ghost btn--small" data-remove-item="${item.id}">REMOVE</button>
           </div>
@@ -696,7 +696,7 @@ function renderCheckoutList() {
           <div class="missing-ingredient-row__name">${itemDisplayLine(item)}</div>
           <div class="missing-ingredient-row__recipes">${escapeHtml([item.get("category"), locationLabel(item.get("location"))].filter(Boolean).join(" · "))}</div>
         </div>
-        <div style="display:flex; gap:0.5rem;">
+        <div style="display:flex; flex-wrap:wrap; gap:0.5rem;">
           <button type="button" class="btn btn--ghost btn--small" data-back-to-list="${item.id}">↩ BACK TO LIST</button>
           <button type="button" class="btn btn--small btn--primary" data-put-away="${item.id}">PUT AWAY</button>
         </div>

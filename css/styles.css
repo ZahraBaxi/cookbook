@@ -42,7 +42,13 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
-html { -webkit-text-size-adjust: 100%; }
+html {
+  -webkit-text-size-adjust: 100%;
+  /* Safety net against any missed overflow case on narrow screens —
+     applied to html (not body) so it doesn't interfere with the sticky
+     site header, which needs body/html as its natural scroll container. */
+  overflow-x: hidden;
+}
 
 /* CRITICAL: without this, any element that both has the [hidden]
    attribute AND a class setting its own `display` (e.g. .btn {
@@ -460,8 +466,9 @@ main { min-height: 60vh; }
 
 .ingredient-list li {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 0.4rem 1rem;
   padding: 0.5rem 0;
   border-bottom: 1px dotted var(--color-border);
   font-size: var(--step-small);
@@ -499,9 +506,10 @@ main { min-height: 60vh; }
 
 .component-row__head {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  gap: 1rem;
+  gap: 0.4rem 1rem;
 }
 
 .component-row__title {
@@ -735,6 +743,7 @@ input[type="radio"] {
 
 .form-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.75rem;
   margin-top: 1.75rem;
   padding-top: 1.25rem;
@@ -810,6 +819,7 @@ input[type="radio"] {
 
 .admin-missing-section__header {
   display: flex;
+  flex-wrap: wrap;
   align-items: stretch;
   justify-content: space-between;
   border-bottom: 1px solid var(--color-border-strong);
@@ -1069,6 +1079,7 @@ input[type="radio"] {
 
 .storage-editor__resize {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
   font-size: var(--step-caption);
@@ -1096,6 +1107,7 @@ input[type="radio"] {
   padding: 0.85rem 1rem;
   font-size: var(--step-base);
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: 0.5rem;

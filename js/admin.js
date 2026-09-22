@@ -347,7 +347,7 @@ function renderSimilarInventory() {
           <div class="missing-ingredient-row__name">${escapeHtml(inventoryItemLabel(g.canonical))}${tag ? ` <span class="missing-ingredient-row__tag">${tag}</span>` : ""}</div>
           <div class="missing-ingredient-row__recipes">${escapeHtml(detail)}</div>
         </div>
-        <div style="display:flex; gap:0.5rem;">
+        <div style="display:flex; flex-wrap:wrap; gap:0.5rem;">
           <button type="button" class="btn btn--ghost btn--small" data-ignore-inventory-group="${idx}">IGNORE</button>
           <button type="button" class="btn btn--small btn--primary" data-merge-inventory-group="${idx}">MERGE</button>
         </div>
@@ -447,7 +447,7 @@ function renderMissingIngredients() {
           <div class="missing-ingredient-row__name">${escapeHtml(titleCase(entry.name))}${entry.requiredSomewhere ? "" : ' <span class="missing-ingredient-row__tag">optional</span>'}</div>
           <div class="missing-ingredient-row__recipes">${escapeHtml(Array.from(entry.recipes).join(", "))}</div>
         </div>
-        <div style="display:flex; gap:0.5rem;">
+        <div style="display:flex; flex-wrap:wrap; gap:0.5rem;">
           <button type="button" class="btn btn--ghost btn--small" data-ignore-missing="${escapeHtml(entry.key)}">IGNORE</button>
           <button type="button" class="btn btn--small btn--primary" data-add-missing="${escapeHtml(addName)}">+ ADD</button>
         </div>
@@ -1579,7 +1579,7 @@ function renderPlantsList() {
           <div class="missing-ingredient-row__name">${escapeHtml(plant.get("name"))} <span class="missing-ingredient-row__tag">${dueText}</span></div>
           <div class="missing-ingredient-row__recipes">${escapeHtml(plant.get("location") || "")} · ${indoorOutdoor} · last watered ${escapeHtml(lastWateredText)}${schedule.note ? " · " + escapeHtml(schedule.note) : ""}</div>
         </div>
-        <div style="display:flex; gap:0.5rem;">
+        <div style="display:flex; flex-wrap:wrap; gap:0.5rem;">
           <button type="button" class="btn btn--ghost btn--small" data-edit-plant="${plant.id}">EDIT</button>
           <button type="button" class="btn btn--small btn--primary" data-water-plant="${plant.id}">💧 WATERED TODAY</button>
         </div>
