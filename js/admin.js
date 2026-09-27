@@ -1581,7 +1581,7 @@ function renderPlantsList() {
         </div>
         <div style="display:flex; flex-wrap:wrap; gap:0.5rem;">
           <button type="button" class="btn btn--ghost btn--small" data-edit-plant="${plant.id}">EDIT</button>
-          <button type="button" class="btn btn--small btn--primary" data-water-plant="${plant.id}">💧 WATERED TODAY</button>
+          <button type="button" class="btn btn--small btn--primary" data-water-plant="${plant.id}"><i class="fa-solid fa-droplet"></i> WATERED TODAY</button>
         </div>
       </div>`;
     })

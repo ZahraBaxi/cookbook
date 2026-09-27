@@ -171,8 +171,8 @@ function locationHasBulkBins(name) {
 }
 
 function itemDisplayLine(item) {
-  const base = item.get("bulk") ? `${item.get("name")} 🫙 bulk` : item.get("name");
-  return item.get("url") ? `${escapeHtml(base)} <a href="${escapeHtml(item.get("url"))}" target="_blank" rel="noopener" style="text-decoration:underline;">🔗</a>` : escapeHtml(base);
+  const base = item.get("bulk") ? `${item.get("name")} <i class="fa-solid fa-box"></i> bulk` : item.get("name");
+  return item.get("url") ? `${escapeHtml(base)} <a href="${escapeHtml(item.get("url"))}" target="_blank" rel="noopener" style="text-decoration:underline;"><i class="fa-solid fa-link"></i></a>` : escapeHtml(base);
 }
 
 /**
@@ -442,7 +442,7 @@ function renderReadonlyList() {
         </label>`;
         })
         .join("");
-      const shareBtn = location ? `<button type="button" class="btn btn--ghost btn--small" data-copy-store-link="${escapeHtml(location)}">🔗 SHARE THIS STORE</button>` : "";
+      const shareBtn = location ? `<button type="button" class="btn btn--ghost btn--small" data-copy-store-link="${escapeHtml(location)}"><i class="fa-solid fa-link"></i> SHARE THIS STORE</button>` : "";
       return `
         <div class="admin-missing-section">
           <div class="admin-missing-section__header">
@@ -697,7 +697,7 @@ function renderCheckoutList() {
           <div class="missing-ingredient-row__recipes">${escapeHtml([item.get("category"), locationLabel(item.get("location"))].filter(Boolean).join(" · "))}</div>
         </div>
         <div style="display:flex; flex-wrap:wrap; gap:0.5rem;">
-          <button type="button" class="btn btn--ghost btn--small" data-back-to-list="${item.id}">↩ BACK TO LIST</button>
+          <button type="button" class="btn btn--ghost btn--small" data-back-to-list="${item.id}"><i class="fa-solid fa-arrow-left"></i> BACK TO LIST</button>
           <button type="button" class="btn btn--small btn--primary" data-put-away="${item.id}">PUT AWAY</button>
         </div>
       </div>`

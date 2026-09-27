@@ -50,6 +50,13 @@ html {
   overflow-x: hidden;
 }
 
+/* Font Awesome icons — inherit the surrounding text color (always
+   black/dark in this design system), small gap before label text. */
+.fa-solid, .fa-regular, .fa-brands { color: inherit; }
+.btn .fa-solid, .missing-ingredient-row .fa-solid, .admin-missing-section__title .fa-solid {
+  margin-right: 0.4em;
+}
+
 /* CRITICAL: without this, any element that both has the [hidden]
    attribute AND a class setting its own `display` (e.g. .btn {
    display: inline-flex }) stays visible — the class's display wins over
