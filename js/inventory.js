@@ -181,6 +181,7 @@ function renderItemCard(item) {
         <span>${escapeHtml(qtyParts.join(" "))}</span>
         <span class="item-card__level">${escapeHtml((item.get("level") || "").toUpperCase())}</span>
       </div>
+      ${item.get("toUse") ? `<div class="item-card__expiry" style="font-weight:700;"><i class="fa-solid fa-recycle"></i> TO USE${item.get("toUseReason") ? " — " + escapeHtml(item.get("toUseReason")) : ""}</div>` : ""}
       ${expiration ? `<div class="item-card__expiry">Expires ${formatDate(expiration)}</div>` : ""}
       ${item.get("notes") ? `<div class="item-card__expiry">${escapeHtml(item.get("notes"))}</div>` : ""}
       <div class="item-card__expiry">Added ${formatDate(item.createdAt)}</div>
@@ -427,13 +428,11 @@ function initInventoryTabs() {
 }
 
 /* ---------------------------------------------------------------------
- * Quick-edit via PIN — separate from Admin login, meant for scanning a
+ * Quick-edit — needs the Admin sign-in, meant for scanning a
  * QR code taped to a shelf/bin and fixing that one item's quantity/
  * level/location in a couple of taps. Browsing/searching never needs
  * this; it only gates the EDIT buttons and the quick-edit modal itself.
  * ------------------------------------------------------------------- */
-
-let pendingQrItemId = null; // set from ?item= on load if we're locked, opened once unlocked
 
 function updateInventoryLockUI() {
   const unlocked = isInventoryUnlocked();
@@ -442,54 +441,21 @@ function updateInventoryLockUI() {
 }
 
 function handleInventoryUnlockToggleClick() {
-  document.getElementById("inventory-pin-error").classList.remove("admin-error--visible");
-  document.getElementById("inventory-pin-input").value = "";
-  openModal(document.getElementById("inventory-pin-modal-overlay"));
-  document.getElementById("inventory-pin-input").focus();
-}
-
-async function handleInventoryPinSubmit(e) {
-  e.preventDefault();
-  const pin = document.getElementById("inventory-pin-input").value.trim();
-  const errorEl = document.getElementById("inventory-pin-error");
-  errorEl.classList.remove("admin-error--visible");
-
-  const submitBtn = e.target.querySelector('button[type="submit"]');
-  submitBtn.disabled = true;
-  submitBtn.textContent = "CHECKING…";
-  try {
-    const result = await Parse.Cloud.run("inventoryLogin", { pin });
-    if (!result || !result.token) throw new Error("No token returned");
-    setInventorySession(result.token);
-    document.getElementById("inventory-pin-input").value = "";
-    closeModal(document.getElementById("inventory-pin-modal-overlay"));
-    updateInventoryLockUI();
-    renderInventory();
-    if (pendingQrItemId) {
-      const id = pendingQrItemId;
-      pendingQrItemId = null;
-      openQuickEditModal(id);
-    }
-  } catch (err) {
-    errorEl.classList.add("admin-error--visible");
-  } finally {
-    submitBtn.disabled = false;
-    submitBtn.textContent = "UNLOCK";
-  }
+  goToAdminSignIn();
 }
 
 function handleInventoryLockClick() {
-  clearInventorySession();
+  clearAdminSession();
   updateInventoryLockUI();
   renderInventory();
-  showToast("Locked.");
+  showToast("Signed out.");
 }
 
 function handleInventoryAuthError(err) {
   if (err && err.code === Parse.Error.INVALID_SESSION_TOKEN) {
-    clearInventorySession();
+    clearAdminSession();
     updateInventoryLockUI();
-    showToast("Session expired — unlock with the PIN again.", "error");
+    showToast("Session expired. Sign in again to edit.", "error");
     return true;
   }
   return false;
@@ -531,8 +497,8 @@ function renderQuickEditLevelSelector(selected) {
 
 function openQuickEditModal(itemId) {
   if (!isInventoryUnlocked()) {
-    pendingQrItemId = itemId;
-    handleInventoryUnlockToggleClick();
+    // Signed out: go sign in, and come back to this item's quick-edit.
+    goToAdminSignIn();
     return;
   }
   const item = allItems.find((i) => i.id === itemId);
@@ -612,8 +578,6 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("copy-inventory-btn").addEventListener("click", handleCopyInventoryClick);
 
   document.getElementById("inventory-unlock-toggle-btn").addEventListener("click", handleInventoryUnlockToggleClick);
-  document.getElementById("inventory-pin-modal-close").addEventListener("click", () => closeModal(document.getElementById("inventory-pin-modal-overlay")));
-  document.getElementById("inventory-pin-form").addEventListener("submit", handleInventoryPinSubmit);
   document.getElementById("inventory-lock-btn").addEventListener("click", handleInventoryLockClick);
   updateInventoryLockUI();
 
@@ -622,8 +586,8 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("quick-edit-finished-btn").addEventListener("click", handleQuickEditFinishedClick);
 
   // A link like inventory.html?item=<id> (e.g. from a QR code taped to a
-  // shelf) opens straight to that item's quick-edit modal once unlocked;
-  // if locked, it prompts for the PIN first and opens it right after.
+  // shelf) opens straight to that item's quick-edit modal once signed in;
+  // if signed out, it goes to the Admin sign-in and comes right back.
   const itemParam = new URLSearchParams(window.location.search).get("item");
 
   loadInventoryData().then(() => {

@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Growth — Common Place</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+<link rel="stylesheet" href="css/styles.css" />
+<link rel="stylesheet" href="css/monk.css" />
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="nav shell" aria-label="Primary">
+    <a class="nav-brand" href="index.html" data-site-title>Common Place</a>
+    <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false"><span></span></button>
+    <ul class="nav-links">
+      <li class="nav-group">
+        <button type="button" class="nav-group__btn" aria-expanded="false">KITCHEN</button>
+        <ul class="nav-sub">
+          <li><a href="cookbook.html">COOKBOOK</a></li>
+          <li><a href="inventory.html">INVENTORY</a></li>
+          <li><a href="groceries.html">GROCERIES</a></li>
+          <li><a href="mealprep.html">MEAL PREP</a></li>
+        </ul>
+      </li>
+      <li><a href="plants.html">PLANTS</a></li>
+      <li><a href="wishlist.html">WISHLIST</a></li>
+      <li class="nav-group">
+        <button type="button" class="nav-group__btn" aria-expanded="false" data-current="true">LIFE</button>
+        <ul class="nav-sub">
+          <li><a href="today.html">TODAY</a></li>
+          <li><a href="practice.html">PRACTICE</a></li>
+          <li><a href="growth.html" aria-current="page">GROWTH</a></li>
+        </ul>
+      </li>
+      <li><a href="admin.html">ADMIN</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main>
+  <div class="shell">
+    <div class="page-header page-header--compact">
+      <div class="page-header__eyebrow">Common Place</div>
+      <h1>GROWTH</h1>
+      <p class="page-header__subtitle">Learning, reading, craft, and what is rising or steeping.</p>
+    </div>
+
+    <div class="monk-gate" id="monk-gate" hidden>
+      <p><strong>Viewing only.</strong> <a href="#" id="monk-signin-link">Sign in</a> to edit.</p>
+    </div>
+
+    <div class="monk-wrap">
+      <div class="monk-shell" id="monk-shell" style="display:none">
+        <nav class="monk-tabs" id="monk-tabs" aria-label="Sections"></nav>
+        <div class="monk-main">
+          <div class="monk-content">
+      <!-- LEARNING -->
+      <section class="monk-section" id="sec-learning" data-title="Learning">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Learning</h1>
+        <p class="monk-lede">Your own notebook, laid out as one web. Drag anything to move it, drag it onto a folder to file it away, click a folder to zoom into what's inside.</p>
+
+        <div class="monk-card">
+          <p class="monk-home-label" style="margin-bottom:8px">Something to explore</p>
+          <select class="monk-select" id="learning-category"></select>
+          <p class="monk-prompt" id="learning-topic"></p>
+          <button class="monk-btn primary" id="learning-done">Mark Studied</button>
+          <button class="monk-btn" id="learning-new">New Topic</button>
+        </div>
+
+        <h2 class="monk-h2">Notebook</h2>
+        <div class="monk-kb-toolbar">
+          <div class="monk-kb-breadcrumb" id="kb-breadcrumb"></div>
+          <div class="monk-kb-actions">
+            <button class="monk-btn" id="kb-new-folder">+ Folder</button>
+            <button class="monk-btn primary" id="kb-new-content">+ Content</button>
+          </div>
+        </div>
+        <div class="monk-kb-web" id="kb-web"></div>
+      </section>
+      <!-- READING -->
+      <section class="monk-section" id="sec-reading" data-title="Reading">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Reading</h1>
+        <p class="monk-lede">A shelf, not a checklist. Click a book to add notes and quotes.</p>
+        <div class="monk-card">
+          <input class="monk-input" id="book-title-input" placeholder="Title">
+          <input class="monk-input" id="book-author-input" placeholder="Author, optional">
+          <button class="monk-btn primary" id="book-add">Add Book</button>
+        </div>
+        <div id="book-list"></div>
+      </section>
+      <!-- CRAFT -->
+      <section class="monk-section" id="sec-craft" data-title="Craft">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Craft</h1>
+        <div class="monk-card">
+          <p class="monk-prompt" id="craft-prompt">Press Random Craft to begin.</p>
+          <button class="monk-btn primary" id="craft-done">Mark Completed</button>
+          <button class="monk-btn" id="craft-new">Random Craft</button>
+        </div>
+        <div id="craft-groups"></div>
+      </section>
+      <!-- SOURDOUGH -->
+      <section class="monk-section" id="sec-sourdough" data-title="Sourdough">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Sourdough</h1>
+
+        <h2 class="monk-h2">Starter Log</h2>
+        <div class="monk-card">
+          <p class="monk-home-value" id="sourdough-last-fed"></p>
+          <input class="monk-input" id="sourdough-note-input" placeholder="Note, optional (example: 50g flour, 50g water)" style="margin-top:14px">
+          <button class="monk-btn primary" id="sourdough-log">Log a Feeding</button>
+        </div>
+        <div id="sourdough-log-entries"></div>
+
+        <h2 class="monk-h2">Discard Recipes</h2>
+        <div class="monk-tag-row" id="sourdough-discard-tags"></div>
+
+        <h2 class="monk-h2">Recipes to Try</h2>
+        <div class="monk-tag-row" id="sourdough-recipe-tags"></div>
+      </section>
+      <!-- TEA -->
+      <section class="monk-section" id="sec-tea" data-title="Tea">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Tea</h1>
+        <p class="monk-lede">Blends made from what you'd scoop out of bulk bins. Mix a jar and steep from it for weeks.</p>
+        <div class="monk-tag-row" id="tea-tags"></div>
+      </section>
+      <!-- WATCHLIST -->
+      <section class="monk-section" id="sec-watchlist" data-title="Watchlist">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Watchlist</h1>
+        <p class="monk-lede">Something to learn from, instead of doomscrolling.</p>
+        <div class="monk-card">
+          <input class="monk-input" id="watch-title-input" placeholder="Title">
+          <input class="monk-input" id="watch-note-input" placeholder="Why this one? (optional)">
+          <button class="monk-btn primary" id="watch-add">Add to Watchlist</button>
+        </div>
+        <button class="monk-btn" id="watch-surprise">What Should I Watch Tonight?</button>
+        <p class="monk-quote" id="watch-suggestion" style="display:none"></p>
+        <ul class="monk-checklist" id="watch-list"></ul>
+      </section>
+          </div>
+        </div>
+      </div>
+
+<input type="file" id="kb-photo-input" accept="image/*" style="display:none">
+
+<div class="monk-modal-overlay" id="monk-modal-overlay" style="display:none">
+  <div class="monk-modal">
+    <button class="monk-modal-close" id="monk-modal-close" aria-label="Close">&times;</button>
+    <div id="monk-modal-body"></div>
+  </div>
+</div>
+
+<div class="monk-sketch-overlay" id="kb-sketch-overlay" style="display:none">
+  <div class="monk-sketch-card">
+    <input class="monk-input monk-sketch-title" id="kb-sketch-title" placeholder="Sketch title">
+    <div class="monk-sketch-toolbar">
+      <button class="monk-sketch-tool active" id="kb-tool-pen" type="button">Pen</button>
+      <button class="monk-sketch-tool" id="kb-tool-eraser" type="button">Eraser</button>
+      <label class="monk-sketch-thickness">
+        Thickness
+        <input type="range" id="kb-thickness" min="1" max="20" value="3">
+      </label>
+      <button class="monk-quiet-link" id="kb-undo" type="button">Undo</button>
+      <button class="monk-btn primary" id="kb-sketch-done" type="button">Done</button>
+    </div>
+    <canvas class="monk-sketch-canvas tool-pen" id="kb-canvas" width="600" height="400"></canvas>
+  </div>
+</div>
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="shell" data-site-footer>Common Place.</div>
+</footer>
+
+<script src="https://unpkg.com/parse/dist/parse.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/parse.js"></script>
+<script src="js/utils.js"></script>
+<script>document.addEventListener("DOMContentLoaded",function(){var l=document.getElementById("monk-signin-link");if(l)l.addEventListener("click",function(e){e.preventDefault();goToAdminSignIn();});});</script>
+<script>window.MONK_PAGE = { label: "Growth" };</script>
+<script src="js/monk/back4app-client.js"></script>
+<script src="js/monk/monk-data.js"></script>
+<script src="js/monk/monk-app.js"></script>
+</body>
+</html>

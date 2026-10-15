@@ -169,6 +169,11 @@ function renderRecipes() {
   const resultsEl = document.getElementById("recipe-results");
   const filtered = allRecipes.filter((r) => recipeMatchesFilter(r) && recipeMatchesType(r) && recipeMatchesReadiness(r) && recipeMatchesSearch(r));
 
+  // Recipes that would use up something flagged "To Use" (going bad,
+  // sitting too long, etc.) get pulled to the top to reduce food waste.
+  // Array.sort is stable, so ties keep their existing order.
+  filtered.sort((a, b) => computeToUseMatches(b, allInventoryItems).length - computeToUseMatches(a, allInventoryItems).length);
+
   if (allRecipes.length === 0) {
     resultsEl.innerHTML = `<div class="empty-state"><p class="empty-state__title">No recipes yet.</p><p>Add your first one from the Admin page.</p></div>`;
     return;
@@ -187,6 +192,12 @@ function renderRecipes() {
     const timeLabel = formatTime(recipe.get("prepTime"), recipe.get("cookTime"));
     const type = recipe.get("recipeType") || "Meal";
     const stars = starRating(recipe.get("difficulty"));
+    const toUseMatches = computeToUseMatches(recipe, allInventoryItems);
+    const toUseLine = toUseMatches.length
+      ? `<div class="recipe-card__touse"><i class="fa-solid fa-recycle"></i> Uses: ${escapeHtml(
+          toUseMatches.map((m) => (m.item.get("toUseReason") ? `${m.item.get("name")} (${m.item.get("toUseReason")})` : m.item.get("name"))).join(", ")
+        )}</div>`
+      : "";
 
     const card = document.createElement("button");
     card.type = "button";
@@ -195,6 +206,7 @@ function renderRecipes() {
       <div class="recipe-card__meta">${escapeHtml((recipe.get("category") || "RECIPE").toUpperCase())}${timeLabel ? " · " + timeLabel : ""} · ${escapeHtml(type.toUpperCase())}${stars ? ` · ${stars}` : ""}</div>
       <div class="recipe-card__title">${escapeHtml(recipe.get("title") || "Untitled")}</div>
       <div class="recipe-card__desc">${escapeHtml(recipe.get("description") || "")}</div>
+      ${toUseLine}
       <span class="status-tag ${ready ? "status-tag--ready" : ""}">${readinessBadgeText(readiness)}</span>
     `;
     card.addEventListener("click", () => openRecipeDetail(recipe));
@@ -249,6 +261,8 @@ function openRecipeDetail(recipe) {
     })
     .join("");
 
+  const toUseDetailMatches = computeToUseMatches(recipe, allInventoryItems);
+
   const applianceRows = (recipe.get("requiredAppliances") || [])
     .map((name) => {
       const have = !readiness.missingAppliances.includes(name);
@@ -267,6 +281,7 @@ function openRecipeDetail(recipe) {
     <div class="recipe-detail__status">
       <span class="status-tag ${ready ? "status-tag--ready" : ""}">${readinessBadgeText(readiness)}</span>
     </div>
+    ${toUseDetailMatches.length ? `<p class="recipe-detail__notes" style="font-weight:600;"><i class="fa-solid fa-recycle"></i> Helps use up: ${escapeHtml(toUseDetailMatches.map((m) => (m.item.get("toUseReason") ? `${m.item.get("name")} (${m.item.get("toUseReason")})` : m.item.get("name"))).join(", "))}</p>` : ""}
     ${componentRows ? `<h3 class="recipe-detail__section-title">Requires</h3><ul class="component-list">${componentRows}</ul>` : ""}
     ${applianceRows ? `<h3 class="recipe-detail__section-title">Appliances Needed</h3><ul class="ingredient-list">${applianceRows}</ul>` : ""}
     ${usedBy.length ? `<h3 class="recipe-detail__section-title">Used By</h3><p class="recipe-detail__notes">${escapeHtml(usedBy.map((r) => r.get("title")).join(", "))}</p>` : ""}

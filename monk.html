@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Urban Monk Rule — Common Place</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+<link rel="stylesheet" href="css/styles.css" />
+<link rel="stylesheet" href="css/monk.css" />
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="nav shell" aria-label="Primary">
+    <a class="nav-brand" href="index.html" data-site-title>Common Place</a>
+    <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false"><span></span></button>
+    <ul class="nav-links">
+      <li><a href="cookbook.html">COOKBOOK</a></li>
+      <li><a href="inventory.html">INVENTORY</a></li>
+      <li><a href="groceries.html">GROCERIES</a></li>
+      <li><a href="mealprep.html">MEAL PREP</a></li>
+      <li><a href="plants.html">PLANTS</a></li>
+      <li><a href="wishlist.html">WISHLIST</a></li>
+      <li><a href="monk.html" aria-current="page">URBAN MONK</a></li>
+      <li><a href="admin.html">ADMIN</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main>
+  <div class="shell">
+    <div class="page-header page-header--compact">
+      <div class="page-header__eyebrow">Field notebook</div>
+      <h1>URBAN MONK RULE</h1>
+      <p class="page-header__subtitle">Daily rhythm, practice, journal, and learning.</p>
+    </div>
+
+    <div class="monk-wrap">
+<div class="monk-auth-screen" id="auth-screen">
+  <div class="monk-auth-card">
+    <p class="monk-title">Sign in</p>
+    <p class="monk-subtitle" id="auth-subtitle">Log in to your practice</p>
+    <div class="monk-auth-error" id="auth-error" style="display:none"></div>
+    <input class="monk-input" id="auth-username" placeholder="Username" autocomplete="username">
+    <input class="monk-input" id="auth-password" type="password" placeholder="Password" autocomplete="current-password">
+    <button class="monk-btn primary" id="auth-submit-btn">Log In</button>
+    <button class="monk-quiet-link" id="auth-toggle-btn">Need an account? Sign up</button>
+  </div>
+</div>
+
+
+
+<div class="monk-shell" id="monk-shell" style="display:none">
+
+  <div class="monk-topmenu">
+    <select id="monk-mobile-nav" aria-label="Chapter"></select>
+  </div>
+
+  <aside class="monk-sidebar">
+    <p class="monk-sidebar-label">Chapters</p>
+    <ul class="monk-nav" id="monk-nav-list"></ul>
+    <button class="monk-quiet-link monk-logout-btn" id="monk-logout-btn">Log Out</button>
+  </aside>
+
+  <main class="monk-main">
+    <div class="monk-content">
+
+      <!-- HOME -->
+      <section class="monk-section" id="sec-home" data-title="Home">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span> &middot; <span id="home-date"></span></p>
+        <h1 class="monk-h1" id="home-greeting">Home</h1>
+
+        <!-- primary: today's vow, the one thing to act on -->
+        <div class="monk-hero" id="home-vow-card">
+          <p class="monk-hero-label">Today's Focus Vow</p>
+          <p class="monk-hero-text" id="home-vow"></p>
+          <button class="monk-btn primary" id="home-vow-btn">Mark as Kept</button>
+        </div>
+
+        <!-- primary: the actual reason to open this page each day -->
+        <div class="monk-question-block">
+          <p class="monk-hero-label">Today's Question</p>
+          <p class="monk-question-text" id="home-question"></p>
+          <div class="monk-question-actions">
+            <button class="monk-quiet-link" id="home-question-new">Another Question</button>
+            <button class="monk-quiet-link" id="home-question-reveal">Reflect on This</button>
+          </div>
+          <div id="home-question-reflect" style="display:none">
+            <textarea class="monk-textarea" id="home-question-answer" placeholder="A line or two is enough..."></textarea>
+            <button class="monk-btn primary" id="home-question-save">Save to Journal</button>
+          </div>
+        </div>
+
+        <!-- secondary: streak, at a glance -->
+        <div class="monk-streak-block">
+          <div class="monk-streak-header">
+            <span class="monk-home-label">Current Streak</span>
+            <span class="monk-home-value" id="home-streak"></span>
+          </div>
+          <div class="monk-streak-row" id="home-streak-dots"></div>
+        </div>
+
+        <!-- tertiary: a quote, cyclable but quiet -->
+        <div class="monk-quote-block">
+          <p class="monk-quote" id="home-quote"></p>
+          <button class="monk-quiet-link" id="home-quote-new">Another Line</button>
+        </div>
+
+        <!-- tertiary: reminders, doubling as a shortcut down to Rhythm below -->
+        <div class="monk-reminder-row">
+          <button class="monk-reminder" id="home-morning-reminder-btn">
+            <span class="monk-home-label">Morning</span>
+            <span id="home-morning-reminder"></span>
+          </button>
+          <button class="monk-reminder" id="home-evening-reminder-btn">
+            <span class="monk-home-label">Evening</span>
+            <span id="home-evening-reminder"></span>
+          </button>
+          <button class="monk-reminder" id="home-dharma-reminder-btn">
+            <span class="monk-home-label">Sit</span>
+            <span id="home-dharma-reminder"></span>
+          </button>
+        </div>
+
+        <div id="home-rhythm-block">
+          <h2 class="monk-h2">Rhythm</h2>
+          <h3 class="monk-h3">Morning</h3>
+          <ul class="monk-checklist" id="rhythm-morning"></ul>
+          <div class="monk-inline-add">
+            <input class="monk-input" id="rhythm-morning-input" placeholder="Add to morning rhythm">
+            <button class="monk-btn primary" id="rhythm-morning-add">Add</button>
+          </div>
+          <h3 class="monk-h3">Evening</h3>
+          <ul class="monk-checklist" id="rhythm-evening"></ul>
+          <div class="monk-inline-add">
+            <input class="monk-input" id="rhythm-evening-input" placeholder="Add to evening rhythm">
+            <button class="monk-btn primary" id="rhythm-evening-add">Add</button>
+          </div>
+        </div>
+
+        <div id="home-todo-block">
+          <h2 class="monk-h2">To-Do</h2>
+          <div class="monk-inline-add">
+            <input class="monk-input" id="home-todo-input" placeholder="Add a task">
+            <button class="monk-btn primary" id="home-todo-add">Add</button>
+          </div>
+          <ul class="monk-checklist" id="home-todo-list"></ul>
+        </div>
+      </section>
+
+      <!-- CALENDAR -->
+      <section class="monk-section" id="sec-calendar" data-title="Calendar">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Calendar</h1>
+        <p class="monk-lede">Appointments and meetings, by day, week, month, or the whole year at a glance. Any day with something on it turns solid.</p>
+
+        <div class="monk-cal-toolbar">
+          <div class="monk-cal-viewswitch" id="cal-view-switch">
+            <button type="button" data-view="day">Day</button>
+            <button type="button" data-view="week">Week</button>
+            <button type="button" data-view="month" class="active">Month</button>
+            <button type="button" data-view="year">Year</button>
+          </div>
+          <div class="monk-cal-nav">
+            <button class="monk-btn" type="button" id="cal-prev" aria-label="Previous">&larr;</button>
+            <button class="monk-btn" type="button" id="cal-today">Today</button>
+            <button class="monk-btn" type="button" id="cal-next" aria-label="Next">&rarr;</button>
+          </div>
+          <p class="monk-cal-label" id="cal-label"></p>
+          <button class="monk-btn primary" type="button" id="cal-new-event">+ Appointment</button>
+        </div>
+
+        <div id="cal-view"></div>
+      </section>
+
+      <!-- WORK -->
+      <section class="monk-section" id="sec-work" data-title="Work">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Work</h1>
+
+        <h2 class="monk-h2">Focus Timer</h2>
+        <div id="work-timer-setup">
+          <div class="monk-tag-row" id="work-duration-row"></div>
+          <button class="monk-btn primary" id="work-timer-start">Start</button>
+        </div>
+        <div id="work-timer-active" style="display:none">
+          <p class="monk-sit-timer" id="work-timer-display">25:00</p>
+          <button class="monk-btn" id="work-timer-pause">Pause</button>
+          <button class="monk-btn" id="work-timer-end">End Session</button>
+        </div>
+
+        <h2 class="monk-h2">Board</h2>
+        <div class="monk-kanban">
+          <div class="monk-kanban-col" id="kanban-col-todo" data-kanban-col="todo">
+            <h3 class="monk-h3">To Do</h3>
+            <div class="monk-kanban-body" id="kanban-body-todo"></div>
+            <div class="monk-inline-add">
+              <input class="monk-input" id="kanban-add-todo" placeholder="Add a card">
+              <button class="monk-btn" data-col="todo">Add</button>
+            </div>
+          </div>
+          <div class="monk-kanban-col" id="kanban-col-doing" data-kanban-col="doing">
+            <h3 class="monk-h3">Doing</h3>
+            <div class="monk-kanban-body" id="kanban-body-doing"></div>
+            <div class="monk-inline-add">
+              <input class="monk-input" id="kanban-add-doing" placeholder="Add a card">
+              <button class="monk-btn" data-col="doing">Add</button>
+            </div>
+          </div>
+          <div class="monk-kanban-col" id="kanban-col-done" data-kanban-col="done">
+            <h3 class="monk-h3">Done</h3>
+            <div class="monk-kanban-body" id="kanban-body-done"></div>
+            <div class="monk-inline-add">
+              <input class="monk-input" id="kanban-add-done" placeholder="Add a card">
+              <button class="monk-btn" data-col="done">Add</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- DHARMA -->
+      <section class="monk-section" id="sec-dharma" data-title="Dharma">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Dharma</h1>
+        <p class="monk-lede">This is a space for practice, not performance. It doesn't need to be perfect or daily.</p>
+
+        <h2 class="monk-h2">Refuge</h2>
+        <div class="monk-card">
+          <p class="monk-prompt">Buddha, Dharma, Sangha. The teacher, the teaching, and the community around it. Taking refuge just means remembering you're not doing this alone.</p>
+          <button class="monk-btn primary" id="dharma-refuge-btn">I Take Refuge Today</button>
+        </div>
+
+        <h2 class="monk-h2">Sit</h2>
+        <div class="monk-card">
+          <div id="dharma-sit-setup">
+            <p class="monk-home-label" style="margin-bottom:10px">Practice</p>
+            <div class="monk-tag-row" id="dharma-practice-row"></div>
+            <p class="monk-home-label" style="margin:20px 0 10px">Length</p>
+            <div class="monk-tag-row" id="dharma-duration-row"></div>
+            <label class="monk-toggle-row">
+              <input type="checkbox" id="dharma-visual-toggle" checked>
+              <span>Show the breathing circle</span>
+            </label>
+            <button class="monk-btn primary" id="dharma-sit-start" style="margin-top:18px">Begin Sitting</button>
+          </div>
+          <div id="dharma-sit-active" style="display:none">
+            <div class="monk-breath-wrap">
+              <div class="monk-breath-circle" id="dharma-breath-circle"></div>
+            </div>
+            <p class="monk-sit-instruction">This won't control your breathing. It's just something soft to look at, if that helps.</p>
+            <p class="monk-sit-timer" id="dharma-sit-timer">10:00</p>
+            <button class="monk-btn" id="dharma-sit-end">End Sitting</button>
+          </div>
+          <p class="monk-note" id="dharma-sit-stats"></p>
+        </div>
+
+        <h2 class="monk-h2">Loving-Kindness</h2>
+        <div class="monk-card">
+          <p class="monk-home-label" id="dharma-metta-stage" style="margin-bottom:10px"></p>
+          <p class="monk-quote" id="dharma-metta-phrase"></p>
+          <button class="monk-quiet-link" id="dharma-metta-next">Next Phrase</button>
+        </div>
+
+        <h2 class="monk-h2">Mala</h2>
+        <div class="monk-card monk-mala-card">
+          <button class="monk-mala-counter" id="dharma-mala-btn" type="button">
+            <span class="monk-mala-n" id="dharma-mala-n">0</span>
+            <span class="monk-mala-label">of 108</span>
+          </button>
+          <p class="monk-note" id="dharma-mala-stats"></p>
+          <button class="monk-quiet-link" id="dharma-mala-reset">Reset Count</button>
+        </div>
+
+        <h2 class="monk-h2">A Verse for the Moment</h2>
+        <div class="monk-card">
+          <p class="monk-quote" id="dharma-gatha"></p>
+          <button class="monk-quiet-link" id="dharma-gatha-new">Another Verse</button>
+        </div>
+
+        <h2 class="monk-h2">Today's Precepts</h2>
+        <p class="monk-lede">Not a scorecard. Just five things to keep in mind today.</p>
+        <ul class="monk-checklist" id="dharma-precepts"></ul>
+
+        <h2 class="monk-h2">Contemplation</h2>
+        <div class="monk-card">
+          <p class="monk-prompt" id="dharma-prompt"></p>
+          <textarea class="monk-textarea" id="dharma-note" placeholder="Sit with it a moment, then write..."></textarea>
+          <button class="monk-btn primary" id="dharma-save">Save Reflection</button>
+          <button class="monk-btn" id="dharma-new">New Prompt</button>
+        </div>
+        <h2 class="monk-h2">Past Reflections</h2>
+        <div id="dharma-entries"></div>
+      </section>
+
+      <!-- MOVEMENT -->
+      <section class="monk-section" id="sec-movement" data-title="Movement">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Movement</h1>
+        <p class="monk-lede">Fixed routines, done the same way every time. Nothing shuffled or random. Click one to walk through it.</p>
+        <div class="monk-tag-row" id="movement-tags"></div>
+      </section>
+
+      <!-- PLACE -->
+      <section class="monk-section" id="sec-place" data-title="Place">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Place</h1>
+        <div class="monk-card">
+          <p class="monk-prompt" id="place-prompt"></p>
+          <textarea class="monk-textarea" id="place-note" placeholder="Write what you noticed..."></textarea>
+          <button class="monk-btn primary" id="place-save">Save Observation</button>
+          <button class="monk-btn" id="place-new">New Prompt</button>
+        </div>
+        <h2 class="monk-h2">Past Observations</h2>
+        <div id="place-entries"></div>
+      </section>
+
+      <!-- PRESENCE -->
+      <section class="monk-section" id="sec-presence" data-title="Presence, Solitude & Humility">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Presence, Solitude &amp; Humility</h1>
+
+        <h2 class="monk-h2">Presence</h2>
+        <div class="monk-card">
+          <p class="monk-prompt" id="presence-prompt"></p>
+          <button class="monk-btn primary" id="presence-done">I Did This</button>
+          <button class="monk-btn" id="presence-new">New Practice</button>
+        </div>
+
+        <h2 class="monk-h2">Solitude</h2>
+        <div class="monk-card">
+          <p class="monk-prompt" id="solitude-prompt"></p>
+          <button class="monk-btn primary" id="solitude-done">Mark Complete</button>
+          <button class="monk-btn" id="solitude-new">Randomize</button>
+        </div>
+
+        <h2 class="monk-h2">Humility</h2>
+        <div class="monk-card">
+          <p class="monk-prompt" id="humility-prompt"></p>
+          <button class="monk-btn" id="humility-new">New Reminder</button>
+        </div>
+      </section>
+
+      <!-- LEARNING -->
+      <section class="monk-section" id="sec-learning" data-title="Learning">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Learning</h1>
+        <p class="monk-lede">Your own notebook, laid out as one web. Drag anything to move it, drag it onto a folder to file it away, click a folder to zoom into what's inside.</p>
+
+        <div class="monk-card">
+          <p class="monk-home-label" style="margin-bottom:8px">Something to explore</p>
+          <select class="monk-select" id="learning-category"></select>
+          <p class="monk-prompt" id="learning-topic"></p>
+          <button class="monk-btn primary" id="learning-done">Mark Studied</button>
+          <button class="monk-btn" id="learning-new">New Topic</button>
+        </div>
+
+        <h2 class="monk-h2">Notebook</h2>
+        <div class="monk-kb-toolbar">
+          <div class="monk-kb-breadcrumb" id="kb-breadcrumb"></div>
+          <div class="monk-kb-actions">
+            <button class="monk-btn" id="kb-new-folder">+ Folder</button>
+            <button class="monk-btn primary" id="kb-new-content">+ Content</button>
+          </div>
+        </div>
+        <div class="monk-kb-web" id="kb-web"></div>
+      </section>
+
+      <!-- READING -->
+      <section class="monk-section" id="sec-reading" data-title="Reading">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Reading</h1>
+        <p class="monk-lede">A shelf, not a checklist. Click a book to add notes and quotes.</p>
+        <div class="monk-card">
+          <input class="monk-input" id="book-title-input" placeholder="Title">
+          <input class="monk-input" id="book-author-input" placeholder="Author, optional">
+          <button class="monk-btn primary" id="book-add">Add Book</button>
+        </div>
+        <div id="book-list"></div>
+      </section>
+
+      <!-- CRAFT -->
+      <section class="monk-section" id="sec-craft" data-title="Craft">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Craft</h1>
+        <div class="monk-card">
+          <p class="monk-prompt" id="craft-prompt">Press Random Craft to begin.</p>
+          <button class="monk-btn primary" id="craft-done">Mark Completed</button>
+          <button class="monk-btn" id="craft-new">Random Craft</button>
+        </div>
+        <div id="craft-groups"></div>
+      </section>
+
+      <!-- PLANTS -->
+      <section class="monk-section" id="sec-plants" data-title="Plants">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Plants</h1>
+        <p class="monk-lede">Seed to seedling to sprout to fruiting to harvestable.</p>
+        <div class="monk-card">
+          <input class="monk-input" id="plant-name-input" placeholder="Name (e.g. Balcony Basil)">
+          <input class="monk-input" id="plant-species-input" placeholder="Variety, optional">
+          <button class="monk-btn primary" id="plant-add">Add Plant</button>
+        </div>
+        <div id="plant-list"></div>
+      </section>
+
+      <!-- SOURDOUGH -->
+      <section class="monk-section" id="sec-sourdough" data-title="Sourdough">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Sourdough</h1>
+
+        <h2 class="monk-h2">Starter Log</h2>
+        <div class="monk-card">
+          <p class="monk-home-value" id="sourdough-last-fed"></p>
+          <input class="monk-input" id="sourdough-note-input" placeholder="Note, optional (example: 50g flour, 50g water)" style="margin-top:14px">
+          <button class="monk-btn primary" id="sourdough-log">Log a Feeding</button>
+        </div>
+        <div id="sourdough-log-entries"></div>
+
+        <h2 class="monk-h2">Discard Recipes</h2>
+        <div class="monk-tag-row" id="sourdough-discard-tags"></div>
+
+        <h2 class="monk-h2">Recipes to Try</h2>
+        <div class="monk-tag-row" id="sourdough-recipe-tags"></div>
+      </section>
+
+      <!-- TEA -->
+      <section class="monk-section" id="sec-tea" data-title="Tea">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Tea</h1>
+        <p class="monk-lede">Blends made from what you'd scoop out of bulk bins. Mix a jar and steep from it for weeks.</p>
+        <div class="monk-tag-row" id="tea-tags"></div>
+      </section>
+
+      <!-- WATCHLIST -->
+      <section class="monk-section" id="sec-watchlist" data-title="Watchlist">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Watchlist</h1>
+        <p class="monk-lede">Something to learn from, instead of doomscrolling.</p>
+        <div class="monk-card">
+          <input class="monk-input" id="watch-title-input" placeholder="Title">
+          <input class="monk-input" id="watch-note-input" placeholder="Why this one? (optional)">
+          <button class="monk-btn primary" id="watch-add">Add to Watchlist</button>
+        </div>
+        <button class="monk-btn" id="watch-surprise">What Should I Watch Tonight?</button>
+        <p class="monk-quote" id="watch-suggestion" style="display:none"></p>
+        <ul class="monk-checklist" id="watch-list"></ul>
+      </section>
+
+      <!-- WISHLIST -->
+      <section class="monk-section" id="sec-wishlist" data-title="Wishlist">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Wishlist</h1>
+        <p class="monk-lede">Things to mull over rather than buy on impulse. Nothing here is a cart.</p>
+
+        <div class="monk-card">
+          <p class="monk-home-label" style="margin-bottom:10px">Daily amount you're setting aside toward things on this list</p>
+          <div class="monk-rate-row">
+            <span>$</span>
+            <input class="monk-input" id="wishlist-rate-input" style="margin-bottom:0" inputmode="decimal">
+            <button class="monk-btn" id="wishlist-rate-save">Save</button>
+          </div>
+          <p class="monk-note" style="margin-top:10px">This comes from what you set aside, not from rent or bills. It's a pace-setter, not a real budget.</p>
+        </div>
+
+        <div class="monk-card">
+          <input class="monk-input" id="wish-name-input" placeholder="Item">
+          <input class="monk-input" id="wish-price-input" placeholder="Price (e.g. 100)" inputmode="decimal">
+          <input class="monk-input" id="wish-note-input" placeholder="Why do you want it? (optional)">
+          <button class="monk-btn primary" id="wish-add">Add to Wishlist</button>
+        </div>
+
+        <div id="wishlist-list"></div>
+      </section>
+
+      <!-- STEWARDSHIP -->
+      <section class="monk-section" id="sec-stewardship" data-title="Stewardship">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Stewardship</h1>
+        <div class="monk-card">
+          <p class="monk-prompt" id="stewardship-prompt"></p>
+          <button class="monk-btn primary" id="stewardship-done">Mark Complete</button>
+          <button class="monk-btn" id="stewardship-new">Randomize</button>
+        </div>
+
+        <h2 class="monk-h2">Stitches &amp; Repairs</h2>
+        <p class="monk-lede">A running reference of mending techniques, so you reach for the right one instead of replacing.</p>
+        <ul class="monk-bookmark-list" id="stitch-list"></ul>
+        <div class="monk-inline-add">
+          <input class="monk-input" id="stitch-input" placeholder="Add a stitch or repair type">
+          <button class="monk-btn primary" id="stitch-add">Add</button>
+        </div>
+
+        <h2 class="monk-h2">To Give Away</h2>
+        <p class="monk-lede" id="giveaway-stats"></p>
+        <ul class="monk-checklist" id="giveaway-list"></ul>
+        <div class="monk-inline-add">
+          <input class="monk-input" id="giveaway-input" placeholder="Something to let go of">
+          <button class="monk-btn primary" id="giveaway-add">Add</button>
+        </div>
+      </section>
+
+      <!-- ATTENTION -->
+      <section class="monk-section" id="sec-attention" data-title="Attention">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Attention</h1>
+        <div class="monk-counter-row">
+          <button class="monk-counter-btn" data-attn="reached">
+            <span class="n" id="attn-n-reached">0</span>
+            <span class="label">I reached for my phone unnecessarily</span>
+          </button>
+          <button class="monk-counter-btn" data-attn="noticed">
+            <span class="n" id="attn-n-noticed">0</span>
+            <span class="label">I noticed and stopped</span>
+          </button>
+          <button class="monk-counter-btn" data-attn="focused">
+            <span class="n" id="attn-n-focused">0</span>
+            <span class="label">I completed focused work</span>
+          </button>
+        </div>
+        <p class="monk-note">Totals shown are for the last 7 days.</p>
+        <p class="monk-note" id="attn-redirect" style="display:none"></p>
+
+        <h2 class="monk-h2">Instead of This</h2>
+        <p class="monk-lede">A few places worth reaching for instead.</p>
+        <ul class="monk-bookmark-list" id="attn-bookmarks"></ul>
+        <div class="monk-bookmark-add">
+          <input class="monk-input" id="attn-bookmark-label" placeholder="Label">
+          <input class="monk-input" id="attn-bookmark-url" placeholder="https://...">
+          <button class="monk-btn primary" id="attn-bookmark-add">Add</button>
+        </div>
+      </section>
+
+      <!-- JOY -->
+      <section class="monk-section" id="sec-joy" data-title="Joy">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Joy</h1>
+        <div class="monk-card">
+          <p class="monk-prompt" id="joy-prompt"></p>
+          <button class="monk-btn primary" id="joy-done">I Did This</button>
+          <button class="monk-btn" id="joy-new">Random Joy</button>
+        </div>
+      </section>
+
+      <!-- JOURNAL -->
+      <section class="monk-section" id="sec-journal" data-title="Journal">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Journal</h1>
+        <textarea class="monk-textarea" id="journal-text" placeholder="Write today's entry..."></textarea>
+        <button class="monk-btn primary" id="journal-save">Save Entry</button>
+        <h2 class="monk-h2">Entries</h2>
+        <div id="journal-entries"></div>
+      </section>
+
+      <!-- RANDOM PRACTICE -->
+      <!-- PROGRESS -->
+      <section class="monk-section" id="sec-progress" data-title="Progress">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Progress</h1>
+        <p class="monk-lede">A record, not a scoreboard. The purpose is reflection, not achievement.</p>
+        <div id="progress-bars"></div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<input type="file" id="kb-photo-input" accept="image/*" style="display:none">
+
+<div class="monk-modal-overlay" id="monk-modal-overlay" style="display:none">
+  <div class="monk-modal">
+    <button class="monk-modal-close" id="monk-modal-close" aria-label="Close">&times;</button>
+    <div id="monk-modal-body"></div>
+  </div>
+</div>
+
+<div class="monk-sketch-overlay" id="kb-sketch-overlay" style="display:none">
+  <div class="monk-sketch-card">
+    <input class="monk-input monk-sketch-title" id="kb-sketch-title" placeholder="Sketch title">
+    <div class="monk-sketch-toolbar">
+      <button class="monk-sketch-tool active" id="kb-tool-pen" type="button">Pen</button>
+      <button class="monk-sketch-tool" id="kb-tool-eraser" type="button">Eraser</button>
+      <label class="monk-sketch-thickness">
+        Thickness
+        <input type="range" id="kb-thickness" min="1" max="20" value="3">
+      </label>
+      <button class="monk-quiet-link" id="kb-undo" type="button">Undo</button>
+      <button class="monk-btn primary" id="kb-sketch-done" type="button">Done</button>
+    </div>
+    <canvas class="monk-sketch-canvas tool-pen" id="kb-canvas" width="600" height="400"></canvas>
+  </div>
+</div>
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="shell" data-site-footer>Common Place.</div>
+</footer>
+
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/monk/back4app-client.js"></script>
+<script src="js/monk/monk-data.js"></script>
+<script src="js/monk/monk-app.js"></script>
+</body>
+</html>

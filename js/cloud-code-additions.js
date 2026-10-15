@@ -1,9 +1,13 @@
 /**
  * cloud-code-additions.js
  * -----------------------------------------------------------------------
- * NOT part of the static GitHub Pages site. This is Back4App Cloud Code —
- * paste it into your existing cloud/main.js (or wherever `adminLogin`
- * currently lives) in the Back4App dashboard, then deploy.
+ * NOT part of the static GitHub Pages site. This is Back4App Cloud Code.
+ *
+ * This is SECTION 1 of the full main.js (the Common Place code). The live
+ * main.js also has SECTION 2, the housewarming site's getPartyDetails, which
+ * is kept out of this public repo on purpose because it holds the party
+ * address and password. Always deploy the complete main.js that comes with
+ * each release, not this file on its own.
  *
  * WHAT'S PRESERVED:
  *   adminLogin's username/password check is unchanged. zeebug / oatmeal
@@ -24,24 +28,8 @@
  *      the visual doll-house grid used in Admin → Layout. All of them
  *      use the Master Key internally (so they work regardless of
  *      Class-Level Permissions) but are gated by requireAdmin().
- *   4. A separate, much lighter PIN gate for the grocery list
- *      (groceries.html) — groceryLogin checks a 4-digit PIN (not the
- *      admin password) and writes a GrocerySession record; adding/
- *      removing grocery items goes through requireGroceryAccess()
- *      instead of requireAdmin(). This is intentionally low-stakes,
- *      the same spirit as the housewarming site's shared password —
- *      meant to keep casual visitors out, not withstand a determined
- *      attacker. The list of shopping locations (name + emoji) is
- *      still admin-only to edit, via requireAdmin() as usual.
- *
- * ONE MORE STEP ON THE BACK4APP DASHBOARD:
- *   Set InventoryItem, Recipe, StorageLayout, GroceryItem, and
- *   GroceryLocation's Class-Level Permissions to "Public Read" and NO
- *   public write/update/delete. That way even if someone got hold of
- *   your App ID/JS Key (which are meant to be public), they still can't
- *   write directly through the client SDK — every write has to go
- *   through these Cloud Functions, which check the admin session or
- *   grocery PIN session as appropriate.
+ *   4. Grocery list and inventory quick-edit editing use the same admin
+ *      session as everything else. There are no PINs. Viewing stays public.
  * -----------------------------------------------------------------------
  */
 
@@ -49,22 +37,24 @@ const ADMIN_USERNAME = "zeebug";
 const ADMIN_PASSWORD = "oatmeal";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 12; // 12 hours
 
-const GROCERY_PIN = "1234"; // change this to whatever you want people to enter
-const GROCERY_SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days — low-stakes, meant to stay unlocked on your phone
 
-const INVENTORY_PIN = "5678"; // change this — deliberately a DIFFERENT pin than groceries, since this touches real stock data
-const INVENTORY_SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days — same reasoning as groceries: convenience for repeated quick edits
 
 const AdminSession = Parse.Object.extend("AdminSession");
 const InventoryItem = Parse.Object.extend("InventoryItem");
 const Recipe = Parse.Object.extend("Recipe");
 const StorageLayout = Parse.Object.extend("StorageLayout");
-const GrocerySession = Parse.Object.extend("GrocerySession");
 const GroceryItem = Parse.Object.extend("GroceryItem");
 const GroceryLocation = Parse.Object.extend("GroceryLocation");
 const Plant = Parse.Object.extend("Plant");
 const BugReport = Parse.Object.extend("BugReport");
-const InventorySession = Parse.Object.extend("InventorySession");
+const WishlistItem = Parse.Object.extend("WishlistItem");
+const MealPrepEntry = Parse.Object.extend("MealPrepEntry");
+
+// Bump this with every release. The Admin page compares it with the site's
+// version so you can tell at a glance whether the latest Cloud Code is live.
+const CLOUD_CODE_VERSION = "v1.8.5";
+
+Parse.Cloud.define("commonPlaceVersion", async () => ({ version: CLOUD_CODE_VERSION }));
 
 Parse.Cloud.define("adminLogin", async (request) => {
   const { username, password } = request.params;
@@ -118,7 +108,7 @@ async function requireAdmin(adminToken) {
   return session;
 }
 
-const INVENTORY_FIELDS = ["name", "variant", "category", "location", "shelf", "quantity", "unit", "level", "notes", "itemType"];
+const INVENTORY_FIELDS = ["name", "variant", "category", "location", "shelf", "quantity", "unit", "level", "notes", "itemType", "toUse", "toUseReason"];
 
 function applyInventoryFields(item, params) {
   INVENTORY_FIELDS.forEach((field) => {
@@ -222,44 +212,10 @@ Parse.Cloud.define("adminSaveStorageLayout", async (request) => {
 });
 
 /* ============================================================
-   Grocery list — PIN-gated, separate from admin login
+   Grocery list — anyone can view it; editing needs the admin session
+   (the one site sign-in). Every grocery write function below calls
+   requireAdmin() first.
    ============================================================ */
-
-Parse.Cloud.define("groceryLogin", async (request) => {
-  const { pin } = request.params;
-  if (pin !== GROCERY_PIN) {
-    throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, "Incorrect PIN.");
-  }
-  const token = "grocery-" + Date.now() + "-" + Math.random().toString(36).slice(2, 10);
-  const session = new GrocerySession();
-  session.set("token", token);
-  session.set("expiresAt", new Date(Date.now() + GROCERY_SESSION_TTL_MS));
-  await session.save(null, { useMasterKey: true });
-  return { token };
-});
-
-/**
- * Throws unless `groceryToken` matches a real, unexpired GrocerySession.
- * Deliberately separate from requireAdmin() — this is a much lower bar
- * (a shared 4-digit PIN, not a username/password), on purpose, so it's
- * easy to hand to someone else without giving them full admin access.
- */
-async function requireGroceryAccess(groceryToken) {
-  if (!groceryToken) {
-    throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, "Missing grocery access token.");
-  }
-  const query = new Parse.Query(GrocerySession);
-  query.equalTo("token", groceryToken);
-  const session = await query.first({ useMasterKey: true });
-  if (!session) {
-    throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, "Invalid grocery session.");
-  }
-  if (session.get("expiresAt") < new Date()) {
-    await session.destroy({ useMasterKey: true });
-    throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, "Grocery session expired. Please enter the PIN again.");
-  }
-  return session;
-}
 
 const GROCERY_ITEM_FIELDS = ["name", "category", "location", "bulk", "status", "url"];
 
@@ -270,7 +226,7 @@ function applyGroceryItemFields(item, params) {
 }
 
 Parse.Cloud.define("groceryCreateItem", async (request) => {
-  await requireGroceryAccess(request.params.groceryToken);
+  await requireAdmin(request.params.adminToken);
   const item = new GroceryItem();
   applyGroceryItemFields(item, request.params);
   await item.save(null, { useMasterKey: true });
@@ -278,7 +234,7 @@ Parse.Cloud.define("groceryCreateItem", async (request) => {
 });
 
 Parse.Cloud.define("groceryUpdateItem", async (request) => {
-  await requireGroceryAccess(request.params.groceryToken);
+  await requireAdmin(request.params.adminToken);
   const query = new Parse.Query(GroceryItem);
   const item = await query.get(request.params.id, { useMasterKey: true });
   applyGroceryItemFields(item, request.params);
@@ -287,7 +243,7 @@ Parse.Cloud.define("groceryUpdateItem", async (request) => {
 });
 
 Parse.Cloud.define("groceryDeleteItem", async (request) => {
-  await requireGroceryAccess(request.params.groceryToken);
+  await requireAdmin(request.params.adminToken);
   const query = new Parse.Query(GroceryItem);
   const item = await query.get(request.params.id, { useMasterKey: true });
   await item.destroy({ useMasterKey: true });
@@ -299,15 +255,15 @@ Parse.Cloud.define("groceryDeleteItem", async (request) => {
  * with whatever details were filled in (location, shelf, quantity, unit,
  * level, expiration, notes — the exact same fields as the admin item
  * form), then removes it from the grocery list entirely since it's now
- * fully migrated into Inventory. Deliberately gated by the grocery PIN,
+ * fully migrated into Inventory. Gated by the admin session,
  * not full admin login — this is the everyday "I'm putting groceries
  * away" action, and requiring a separate admin session for it would
- * defeat the point of the lighter PIN. Worth knowing: this does mean
- * anyone with the grocery PIN can create Inventory records this way, not
+ * route around it. Worth knowing: this is
+ * admin-only, so only a signed-in admin can create Inventory records this way, not
  * just Grocery ones.
  */
 Parse.Cloud.define("groceryCheckoutToInventory", async (request) => {
-  await requireGroceryAccess(request.params.groceryToken);
+  await requireAdmin(request.params.adminToken);
   const { groceryItemId } = request.params;
 
   const item = new InventoryItem();
@@ -324,14 +280,14 @@ Parse.Cloud.define("groceryCheckoutToInventory", async (request) => {
 });
 
 /**
- * Lets the grocery-PIN-gated pages delete an InventoryItem directly —
+ * Lets the grocery page delete an InventoryItem directly —
  * used for "mark this low-stock item as finished, take it off the shelf
  * entirely" right from the grocery list, without needing a separate
- * admin login. Same trade-off noted above: the grocery PIN can now touch
+ * admin login. Same trade-off noted above: admin-gated, so only a signed-in admin can touch
  * Inventory too, not just the grocery list.
  */
 Parse.Cloud.define("groceryDeleteInventoryItem", async (request) => {
-  await requireGroceryAccess(request.params.groceryToken);
+  await requireAdmin(request.params.adminToken);
   const query = new Parse.Query(InventoryItem);
   const item = await query.get(request.params.id, { useMasterKey: true });
   await item.destroy({ useMasterKey: true });
@@ -340,8 +296,8 @@ Parse.Cloud.define("groceryDeleteInventoryItem", async (request) => {
 
 /**
  * Shopping locations (name + emoji, e.g. "🥕 Sac Central Farmers Market")
- * are admin-managed, NOT grocery-PIN managed — set up once in
- * Admin → Groceries, then everyone with the grocery PIN just picks from
+ * are set up once in
+ * Admin → Groceries, then the grocery page just picks from
  * the list. Upserts by id: pass no id to create, an id to edit.
  * `hasBulkBins` marks a location as having a bulk-bin section, which is
  * what lets the "Bulk section" checkbox show up when adding an item
@@ -355,12 +311,36 @@ Parse.Cloud.define("adminSaveGroceryLocation", async (request) => {
     location = await new Parse.Query(GroceryLocation).get(id, { useMasterKey: true });
   } else {
     location = new GroceryLocation();
+    // New locations go to the bottom of the admin-chosen order.
+    const last = await new Parse.Query(GroceryLocation).descending("sortOrder").first({ useMasterKey: true });
+    const lastOrder = last && typeof last.get("sortOrder") === "number" ? last.get("sortOrder") : -1;
+    location.set("sortOrder", lastOrder + 1);
   }
   if (name !== undefined) location.set("name", name);
   if (emoji !== undefined) location.set("emoji", emoji);
   if (hasBulkBins !== undefined) location.set("hasBulkBins", !!hasBulkBins);
   await location.save(null, { useMasterKey: true });
   return location.toJSON();
+});
+
+/**
+ * Saves the admin-chosen order of shopping locations. `ids` is the full
+ * list of GroceryLocation ids in the order they should appear; each gets
+ * its index as `sortOrder`. Read-only users never see this — it only
+ * changes the order stores are listed on groceries.html.
+ */
+Parse.Cloud.define("adminReorderGroceryLocations", async (request) => {
+  await requireAdmin(request.params.adminToken);
+  const ids = request.params.ids;
+  if (!Array.isArray(ids)) throw new Error("ids must be an array.");
+  const locations = await new Parse.Query(GroceryLocation).containedIn("objectId", ids).limit(1000).find({ useMasterKey: true });
+  const byId = new Map(locations.map((l) => [l.id, l]));
+  ids.forEach((id, i) => {
+    const loc = byId.get(id);
+    if (loc) loc.set("sortOrder", i);
+  });
+  await Parse.Object.saveAll(Array.from(byId.values()), { useMasterKey: true });
+  return { success: true };
 });
 
 Parse.Cloud.define("adminDeleteGroceryLocation", async (request) => {
@@ -416,7 +396,7 @@ Parse.Cloud.define("adminDeletePlant", async (request) => {
 });
 
 /**
- * Bug reports (bug.html) — deliberately NOT gated by any PIN or login,
+ * Bug reports (bug.html) — deliberately NOT gated by any login,
  * same as a public contact form: anyone should be able to report a
  * problem without needing credentials. There's no public "read" of these
  * anywhere in the app — check them in the Back4App dashboard directly
@@ -439,41 +419,181 @@ Parse.Cloud.define("createBugReport", async (request) => {
 });
 
 /* ============================================================
-   Inventory quick-edit — PIN-gated, separate from both admin login and
-   the grocery PIN. Meant for scanning a QR code on a shelf and fixing
-   that one item's quantity/level/location in a couple of taps, without
-   a full admin session.
+   Wishlist — future purchases with price, store, link, type tags, and
+   a savings tracker. Admin-only writes; the public wishlist.html reads.
    ============================================================ */
 
-Parse.Cloud.define("inventoryLogin", async (request) => {
-  const { pin } = request.params;
-  if (pin !== INVENTORY_PIN) {
-    throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, "Incorrect PIN.");
+Parse.Cloud.define("adminSaveWishlistItem", async (request) => {
+  await requireAdmin(request.params.adminToken);
+  const { id, name, url, price, store, tags, saved, notes } = request.params;
+  let item;
+  if (id) {
+    item = await new Parse.Query(WishlistItem).get(id, { useMasterKey: true });
+  } else {
+    item = new WishlistItem();
   }
-  const token = "inventory-" + Date.now() + "-" + Math.random().toString(36).slice(2, 10);
-  const session = new InventorySession();
-  session.set("token", token);
-  session.set("expiresAt", new Date(Date.now() + INVENTORY_SESSION_TTL_MS));
-  await session.save(null, { useMasterKey: true });
-  return { token };
+  if (name !== undefined) item.set("name", name);
+  if (url !== undefined) item.set("url", url);
+  if (price !== undefined) item.set("price", Number(price) || 0);
+  if (store !== undefined) item.set("store", store);
+  if (tags !== undefined) item.set("tags", Array.isArray(tags) ? tags : []);
+  if (saved !== undefined) item.set("saved", Math.max(0, Number(saved) || 0));
+  if (notes !== undefined) item.set("notes", notes);
+  await item.save(null, { useMasterKey: true });
+  return item.toJSON();
 });
 
-async function requireInventoryAccess(inventoryToken) {
-  if (!inventoryToken) {
-    throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, "Missing inventory access token.");
+// Adds (or, with a negative number, removes) money set aside toward a wishlist item.
+Parse.Cloud.define("adminAddWishlistSavings", async (request) => {
+  await requireAdmin(request.params.adminToken);
+  const item = await new Parse.Query(WishlistItem).get(request.params.id, { useMasterKey: true });
+  item.set("saved", Math.max(0, (item.get("saved") || 0) + (Number(request.params.amount) || 0)));
+  await item.save(null, { useMasterKey: true });
+  return item.toJSON();
+});
+
+Parse.Cloud.define("adminDeleteWishlistItem", async (request) => {
+  await requireAdmin(request.params.adminToken);
+  const item = await new Parse.Query(WishlistItem).get(request.params.id, { useMasterKey: true });
+  await item.destroy({ useMasterKey: true });
+  return { success: true };
+});
+
+/* ============================================================
+   Today / Practice / Growth — the personal notebook pages. Their data
+   lives in classes named Monk* (MonkDay, MonkJournalEntry, ...). These
+   four functions are the only way in: they check the admin session,
+   work only on classes whose name starts with "Monk", and use the
+   Master Key. monkFind is open to everyone (view only) except for the
+   journal; the other three need the admin session. In the Back4App dashboard, set every Monk* class's
+   Class-Level Permissions to NO public read and NO public write, so the
+   journal and everything else is private to the admin login.
+   ============================================================ */
+
+function requireMonkClass(name) {
+  if (typeof name !== "string" || !/^Monk[A-Za-z]+$/.test(name)) {
+    throw new Error("Not a notebook class.");
   }
-  const query = new Parse.Query(InventorySession);
-  query.equalTo("token", inventoryToken);
-  const session = await query.first({ useMasterKey: true });
-  if (!session) {
-    throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, "Invalid inventory session.");
-  }
-  if (session.get("expiresAt") < new Date()) {
-    await session.destroy({ useMasterKey: true });
-    throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, "Inventory session expired. Please enter the PIN again.");
-  }
-  return session;
+  return name;
 }
+
+function monkSafeFields(fields) {
+  const clean = Object.assign({}, fields || {});
+  ["objectId", "createdAt", "updatedAt", "ACL"].forEach((k) => delete clean[k]);
+  return clean;
+}
+
+// Anyone can view the notebook pages, except the journal, which needs the
+// admin session. Creating, updating and deleting always need it.
+const MONK_PRIVATE_CLASSES = ["MonkJournalEntry"];
+
+Parse.Cloud.define("monkFind", async (request) => {
+  const className = requireMonkClass(request.params.className);
+  if (MONK_PRIVATE_CLASSES.includes(className)) {
+    await requireAdmin(request.params.adminToken);
+  }
+  const order = String(request.params.order || "");
+  const out = [];
+  let skip = 0;
+  const limit = 1000;
+  while (skip < 20000) {
+    const query = new Parse.Query(className);
+    order.split(",").map((t) => t.trim()).filter(Boolean).forEach((t) => {
+      if (t.startsWith("-")) query.addDescending(t.slice(1));
+      else query.addAscending(t);
+    });
+    query.limit(limit).skip(skip);
+    const page = await query.find({ useMasterKey: true });
+    page.forEach((o) => out.push(o.toJSON()));
+    if (page.length < limit) break;
+    skip += limit;
+  }
+  return out;
+});
+
+Parse.Cloud.define("adminMonkCreate", async (request) => {
+  await requireAdmin(request.params.adminToken);
+  const className = requireMonkClass(request.params.className);
+  const obj = new Parse.Object(className);
+  obj.set(monkSafeFields(request.params.fields));
+  obj.set("owner", ADMIN_USERNAME);
+  await obj.save(null, { useMasterKey: true });
+  return { objectId: obj.id, createdAt: obj.createdAt };
+});
+
+Parse.Cloud.define("adminMonkUpdate", async (request) => {
+  await requireAdmin(request.params.adminToken);
+  const className = requireMonkClass(request.params.className);
+  const obj = await new Parse.Query(className).get(request.params.objectId, { useMasterKey: true });
+  obj.set(monkSafeFields(request.params.fields));
+  await obj.save(null, { useMasterKey: true });
+  return { updatedAt: obj.updatedAt };
+});
+
+Parse.Cloud.define("adminMonkDelete", async (request) => {
+  await requireAdmin(request.params.adminToken);
+  const className = requireMonkClass(request.params.className);
+  const obj = await new Parse.Query(className).get(request.params.objectId, { useMasterKey: true });
+  await obj.destroy({ useMasterKey: true });
+  return { success: true };
+});
+
+/* ============================================================
+   Meal prep — what got prepped this week, on which day, and the easy
+   meals it makes ([{ name, when, done }]). Anyone can view the plan
+   through mealPrepFind; every write is admin-gated here.
+   ============================================================ */
+
+// Anyone can view the plan. Read through a function so it never depends
+// on Class-Level Permissions for MealPrepEntry.
+Parse.Cloud.define("mealPrepFind", async () => {
+  const entries = await new Parse.Query(MealPrepEntry).ascending("createdAt").limit(1000).find({ useMasterKey: true });
+  return entries.map((e) => e.toJSON());
+});
+
+Parse.Cloud.define("adminSaveMealPrepEntry", async (request) => {
+  await requireAdmin(request.params.adminToken);
+  const { id, title, recipeId, prepDay, notes, meals } = request.params;
+  let entry;
+  if (id) {
+    entry = await new Parse.Query(MealPrepEntry).get(id, { useMasterKey: true });
+  } else {
+    entry = new MealPrepEntry();
+  }
+  if (title !== undefined) entry.set("title", String(title));
+  if (recipeId !== undefined) entry.set("recipeId", String(recipeId));
+  if (prepDay !== undefined) entry.set("prepDay", String(prepDay));
+  if (notes !== undefined) entry.set("notes", String(notes));
+  if (meals !== undefined) {
+    const clean = (Array.isArray(meals) ? meals : [])
+      .map((m) => ({ name: String((m && m.name) || "").trim(), when: String((m && m.when) || "Any"), done: !!(m && m.done) }))
+      .filter((m) => m.name);
+    entry.set("meals", clean);
+  }
+  await entry.save(null, { useMasterKey: true });
+  return entry.toJSON();
+});
+
+Parse.Cloud.define("adminDeleteMealPrepEntry", async (request) => {
+  await requireAdmin(request.params.adminToken);
+  const entry = await new Parse.Query(MealPrepEntry).get(request.params.id, { useMasterKey: true });
+  await entry.destroy({ useMasterKey: true });
+  return { success: true };
+});
+
+// Weekly reset: clears every entry so a new week starts empty.
+Parse.Cloud.define("adminResetMealPrep", async (request) => {
+  await requireAdmin(request.params.adminToken);
+  const entries = await new Parse.Query(MealPrepEntry).limit(1000).find({ useMasterKey: true });
+  await Parse.Object.destroyAll(entries, { useMasterKey: true });
+  return { success: true, removed: entries.length };
+});
+
+/* ============================================================
+   Inventory quick-edit — for scanning a QR code on a shelf and fixing
+   that one item's quantity/level/location in a couple of taps. Needs
+   the admin session (the one site sign-in), like every other edit.
+   ============================================================ */
 
 /**
  * Deliberately narrower than adminUpdateInventoryItem — only the fields
@@ -484,7 +604,7 @@ async function requireInventoryAccess(inventoryToken) {
 const INVENTORY_QUICK_EDIT_FIELDS = ["quantity", "unit", "level", "location", "shelf", "notes"];
 
 Parse.Cloud.define("inventoryQuickUpdateItem", async (request) => {
-  await requireInventoryAccess(request.params.inventoryToken);
+  await requireAdmin(request.params.adminToken);
   const query = new Parse.Query(InventoryItem);
   const item = await query.get(request.params.id, { useMasterKey: true });
   INVENTORY_QUICK_EDIT_FIELDS.forEach((field) => {
@@ -495,7 +615,7 @@ Parse.Cloud.define("inventoryQuickUpdateItem", async (request) => {
 });
 
 Parse.Cloud.define("inventoryQuickDeleteItem", async (request) => {
-  await requireInventoryAccess(request.params.inventoryToken);
+  await requireAdmin(request.params.adminToken);
   const query = new Parse.Query(InventoryItem);
   const item = await query.get(request.params.id, { useMasterKey: true });
   await item.destroy({ useMasterKey: true });

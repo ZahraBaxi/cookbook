@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>THE KITCHEN</title>
-<meta name="description" content="A personal cookbook and kitchen inventory." />
+<title>Common Place</title>
+<meta name="description" content="A personal home hub: cookbook, inventory, groceries, plants, and wishlist." />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -15,25 +15,46 @@
 
 <header class="site-header">
   <nav class="nav shell" aria-label="Primary">
-    <a class="nav-brand" href="index.html" data-site-title>THE KITCHEN</a>
+    <a class="nav-brand" href="index.html" data-site-title>Common Place</a>
     <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false"><span></span></button>
     <ul class="nav-links">
-      <li><a href="cookbook.html">COOKBOOK</a></li>
-      <li><a href="inventory.html">INVENTORY</a></li>
-      <li><a href="groceries.html">GROCERIES</a></li>
+      <li class="nav-group">
+        <button type="button" class="nav-group__btn" aria-expanded="false">KITCHEN</button>
+        <ul class="nav-sub">
+          <li><a href="cookbook.html">COOKBOOK</a></li>
+          <li><a href="inventory.html">INVENTORY</a></li>
+          <li><a href="groceries.html">GROCERIES</a></li>
+          <li><a href="mealprep.html">MEAL PREP</a></li>
+        </ul>
+      </li>
       <li><a href="plants.html">PLANTS</a></li>
+      <li><a href="wishlist.html">WISHLIST</a></li>
+      <li class="nav-group">
+        <button type="button" class="nav-group__btn" aria-expanded="false">LIFE</button>
+        <ul class="nav-sub">
+          <li><a href="today.html">TODAY</a></li>
+          <li><a href="practice.html">PRACTICE</a></li>
+          <li><a href="growth.html">GROWTH</a></li>
+        </ul>
+      </li>
       <li><a href="admin.html">ADMIN</a></li>
     </ul>
   </nav>
 </header>
 
 <main class="shell landing">
-  <h1 data-site-title>Zahra's Space</h1>
-  <p data-home-subtitle>My digital inventory & lists for my home.</p>
-  <div class="landing-links">
-    <a class="btn btn--primary" href="cookbook.html">Browse the Cookbook</a>
-    <a class="btn btn--ghost" href="inventory.html">See the Inventory</a>
-    <a class="btn btn--ghost" href="groceries.html">See Grocery List</a>
+  <h1 data-site-title>Common Place</h1>
+  <p data-home-subtitle>Everything for home, in one place.</p>
+  <div class="hub-grid">
+    <a class="hub-card" href="cookbook.html"><i class="fa-solid fa-book-open"></i><span class="hub-card__title">COOKBOOK</span><span class="hub-card__desc">Recipes, and what you can make right now.</span></a>
+    <a class="hub-card" href="inventory.html"><i class="fa-solid fa-box-archive"></i><span class="hub-card__title">INVENTORY</span><span class="hub-card__desc">What is in the kitchen and where it lives.</span></a>
+    <a class="hub-card" href="groceries.html"><i class="fa-solid fa-basket-shopping"></i><span class="hub-card__title">GROCERIES</span><span class="hub-card__desc">The shopping list, store by store.</span></a>
+    <a class="hub-card" href="mealprep.html"><i class="fa-solid fa-utensils"></i><span class="hub-card__title">MEAL PREP</span><span class="hub-card__desc">This week's prep and the easy meals it makes.</span></a>
+    <a class="hub-card" href="plants.html"><i class="fa-solid fa-leaf"></i><span class="hub-card__title">PLANTS</span><span class="hub-card__desc">Watering schedule, adjusted for weather.</span></a>
+    <a class="hub-card" href="wishlist.html"><i class="fa-solid fa-star"></i><span class="hub-card__title">WISHLIST</span><span class="hub-card__desc">Things to save up for.</span></a>
+    <a class="hub-card" href="today.html"><i class="fa-solid fa-sun"></i><span class="hub-card__title">TODAY</span><span class="hub-card__desc">Calendar, work, journal, and progress.</span></a>
+    <a class="hub-card" href="practice.html"><i class="fa-solid fa-spa"></i><span class="hub-card__title">PRACTICE</span><span class="hub-card__desc">Dharma, movement, place, presence, and care.</span></a>
+    <a class="hub-card" href="growth.html"><i class="fa-solid fa-seedling"></i><span class="hub-card__title">GROWTH</span><span class="hub-card__desc">Learning, reading, craft, sourdough, and tea.</span></a>
   </div>
 </main>
 

@@ -98,6 +98,28 @@ function showDashboard() {
   document.getElementById("admin-username-display").textContent = sessionStorage.getItem(CONFIG.ADMIN_USER_KEY) || "";
   loadAdminInventory();
   loadAdminRecipes();
+  checkCloudCodeVersion();
+}
+
+/**
+ * Shows whether the Cloud Code running on Back4App is the same release as
+ * this site. An out-of-date or missing deploy is the usual reason a save
+ * says "Invalid function".
+ */
+async function checkCloudCodeVersion() {
+  const note = document.getElementById("cloud-version-note");
+  try {
+    const result = await Parse.Cloud.run("commonPlaceVersion");
+    if (result && result.version === CONFIG.APP_VERSION) {
+      note.hidden = true;
+      return;
+    }
+    note.textContent = "Cloud Code is " + (result && result.version ? result.version : "an unknown version") +
+      " but this site is " + CONFIG.APP_VERSION + ". Redeploy main.js in Back4App (Cloud Code, then Deploy).";
+  } catch (err) {
+    note.textContent = "The latest Cloud Code is not running yet, so some saves will fail. Replace main.js in Back4App (Cloud Code), click Deploy, then reload this page.";
+  }
+  note.hidden = false;
 }
 
 function showLogin() {
@@ -121,6 +143,12 @@ async function handleLogin(e) {
     if (result && result.token) {
       setAdminSession(result.token, username);
       document.getElementById("admin-password").value = "";
+      // Came here from another page's "sign in to edit"? Go straight back.
+      const back = new URLSearchParams(window.location.search).get("return");
+      if (back && /^[a-z0-9-]+\.html(\?[^#\s]*)?(#\S*)?$/i.test(back)) {
+        window.location.href = back;
+        return;
+      }
       showDashboard();
     } else {
       throw new Error("No token returned");
@@ -150,6 +178,7 @@ function initTabs() {
     layout: { tab: document.getElementById("tab-layout"), panel: document.getElementById("panel-layout") },
     groceries: { tab: document.getElementById("tab-groceries"), panel: document.getElementById("panel-groceries") },
     plants: { tab: document.getElementById("tab-plants"), panel: document.getElementById("panel-plants") },
+    wishlist: { tab: document.getElementById("tab-wishlist"), panel: document.getElementById("panel-wishlist") },
   };
 
   function activate(name) {
@@ -161,6 +190,7 @@ function initTabs() {
     if (name === "layout") activateLayoutTab();
     if (name === "groceries") loadGroceryLocations();
     if (name === "plants") activatePlantsTab();
+    if (name === "wishlist") loadWishlist();
   }
 
   tabs.inventory.tab.addEventListener("click", () => activate("inventory"));
@@ -168,6 +198,7 @@ function initTabs() {
   tabs.layout.tab.addEventListener("click", () => activate("layout"));
   tabs.groceries.tab.addEventListener("click", () => activate("groceries"));
   tabs.plants.tab.addEventListener("click", () => activate("plants"));
+  tabs.wishlist.tab.addEventListener("click", () => activate("wishlist"));
 }
 
 /* ---------------------------------------------------------------------
@@ -492,7 +523,7 @@ function renderAdminInventoryList() {
       (item) => `
       <div class="admin-row">
         <label class="checkbox-field"><input type="checkbox" class="bulk-select" data-select-item="${item.id}" ${selectedInventoryIds.has(item.id) ? "checked" : ""} /></label>
-        <div class="admin-row__title">${escapeHtml(inventoryItemLabel(item))}</div>
+        <div class="admin-row__title">${escapeHtml(inventoryItemLabel(item))}${item.get("toUse") ? ' <i class="fa-solid fa-recycle" title="Flagged To Use"></i>' : ""}</div>
         <div>${escapeHtml(item.get("category") || "")}</div>
         <div>${escapeHtml(item.get("location") || "")}${item.get("shelf") ? " · " + escapeHtml(item.get("shelf")) : ""}</div>
         <div>${escapeHtml((item.get("level") || "").toUpperCase())}</div>
@@ -698,12 +729,18 @@ function openItemForm(itemId, prefillName) {
     document.getElementById("item-notes").value = item.get("notes") || "";
     document.getElementById("item-level").value = item.get("level") || "Full";
     renderLevelSelector(item.get("level") || "Full");
+    document.getElementById("item-touse").checked = !!item.get("toUse");
+    document.getElementById("item-touse-reason").value = item.get("toUseReason") || "";
+    document.getElementById("item-touse-reason-field").hidden = !item.get("toUse");
   } else {
     setLocationPickerValue(null, null);
     document.getElementById("item-appliance-location").value = "";
     document.getElementById("item-level").value = "Full";
     renderLevelSelector("Full");
     document.getElementById("item-variant").value = "";
+    document.getElementById("item-touse").checked = false;
+    document.getElementById("item-touse-reason").value = "";
+    document.getElementById("item-touse-reason-field").hidden = true;
     if (prefillName) {
       document.getElementById("item-name").value = titleCase(prefillName);
     }
@@ -744,6 +781,8 @@ async function handleItemFormSubmit(e) {
         level: "",
         notes: document.getElementById("item-notes").value.trim(),
         expirationDate: null,
+        toUse: false,
+        toUseReason: "",
       }
     : {
         name: document.getElementById("item-name").value.trim(),
@@ -757,6 +796,8 @@ async function handleItemFormSubmit(e) {
         level: document.getElementById("item-level").value,
         notes: document.getElementById("item-notes").value.trim(),
         expirationDate: document.getElementById("item-expiration").value || null,
+        toUse: document.getElementById("item-touse").checked,
+        toUseReason: document.getElementById("item-touse").checked ? document.getElementById("item-touse-reason").value.trim() : "",
       };
 
   try {
@@ -1376,14 +1417,14 @@ function handleRecipeDeleteClick() {
  * Grocery shopping locations (Admin → Groceries) — the emoji-tagged
  * places you shop, e.g. "🥕 Sac Central Farmers Market". Managed here
  * under full admin login; the actual shopping list (add items, check
- * off) lives on the separate, PIN-gated groceries.html.
+ * off) lives on the separate groceries.html.
  * ------------------------------------------------------------------- */
 
 async function loadGroceryLocations() {
   const listEl = document.getElementById("grocery-locations-list");
   listEl.innerHTML = `<div class="loading-row">Loading…</div>`;
   try {
-    groceryLocations = await new Parse.Query(GroceryLocationClass).ascending("name").limit(200).find();
+    groceryLocations = sortGroceryLocations(await new Parse.Query(GroceryLocationClass).ascending("name").limit(200).find());
     renderGroceryLocationsList();
   } catch (err) {
     console.error(err);
@@ -1398,14 +1439,20 @@ function renderGroceryLocationsList() {
     return;
   }
 
-  listEl.innerHTML = groceryLocations
+  const notice = groceryLocNotice
+    ? `<p class="admin-error admin-error--visible" role="alert" style="margin:0 0 1rem;">${escapeHtml(groceryLocNotice)}</p>`
+    : "";
+  listEl.innerHTML = notice + groceryLocations
     .map(
-      (loc) => `
-      <div class="missing-ingredient-row">
+      (loc, i) => `
+      <div class="missing-ingredient-row grocery-loc-row" data-loc-id="${loc.id}">
+        <button type="button" class="grocery-loc-handle" data-loc-handle aria-label="Drag to reorder" title="Drag to reorder"><i class="fa-solid fa-grip-vertical"></i></button>
         <div>
           <div class="missing-ingredient-row__name">${escapeHtml(loc.get("emoji") || "")} ${escapeHtml(loc.get("name") || "")}</div>
           ${loc.get("hasBulkBins") ? `<div class="missing-ingredient-row__recipes">Has a bulk bin section</div>` : ""}
         </div>
+        <button type="button" class="btn btn--ghost btn--small" data-loc-move="-1" data-loc-id="${loc.id}" aria-label="Move up" ${i === 0 ? "disabled" : ""}><i class="fa-solid fa-arrow-up"></i></button>
+        <button type="button" class="btn btn--ghost btn--small" data-loc-move="1" data-loc-id="${loc.id}" aria-label="Move down" ${i === groceryLocations.length - 1 ? "disabled" : ""}><i class="fa-solid fa-arrow-down"></i></button>
         <button type="button" class="btn btn--ghost btn--small" data-edit-grocery-location="${loc.id}">EDIT</button>
       </div>`
     )
@@ -1413,6 +1460,92 @@ function renderGroceryLocationsList() {
 
   listEl.querySelectorAll("[data-edit-grocery-location]").forEach((btn) => {
     btn.addEventListener("click", () => openGroceryLocationModal(btn.getAttribute("data-edit-grocery-location")));
+  });
+  listEl.querySelectorAll("[data-loc-move]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.getAttribute("data-loc-id");
+      const from = groceryLocations.findIndex((l) => l.id === id);
+      moveGroceryLocation(from, from + Number(btn.getAttribute("data-loc-move")));
+    });
+  });
+  initGroceryLocationDrag(listEl);
+}
+
+/** Moves one location to a new position, then saves the whole order. */
+let groceryLocNotice = ""; // stays on screen until the next order save works
+
+async function moveGroceryLocation(from, to) {
+  if (from < 0 || to < 0 || to >= groceryLocations.length || from === to) return;
+  const next = [...groceryLocations];
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  const previous = groceryLocations;
+  groceryLocations = next;
+  renderGroceryLocationsList();
+  try {
+    await runAdminCloud("adminReorderGroceryLocations", { ids: next.map((l) => l.id) });
+    next.forEach((l, i) => l.set("sortOrder", i));
+    if (groceryLocNotice) {
+      groceryLocNotice = "";
+      renderGroceryLocationsList();
+    }
+  } catch (err) {
+    console.error(err);
+    groceryLocations = previous;
+    const why = (err && err.message) || "unknown error";
+    groceryLocNotice = "The new order was not saved, so it went back. Reason: " + why +
+      (/invalid function/i.test(why) ? ". Redeploy Cloud Code with the latest main.js, then try again." : "");
+    renderGroceryLocationsList();
+  }
+}
+
+/**
+ * Drag-to-reorder with pointer events (mouse and touch). Drag starts only
+ * from the grip handle, so scrolling still works everywhere else on a
+ * phone. Move/up listeners sit on the document, which is the most
+ * dependable way to keep tracking the pointer after it leaves the handle.
+ */
+function initGroceryLocationDrag(listEl) {
+  listEl.querySelectorAll("[data-loc-handle]").forEach((handle) => {
+    handle.addEventListener("pointerdown", (e) => {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      const row = handle.closest(".grocery-loc-row");
+      if (!row) return;
+      e.preventDefault();
+      const rows = () => Array.from(listEl.querySelectorAll(".grocery-loc-row"));
+      const from = rows().indexOf(row);
+      let to = from;
+      row.classList.add("grocery-loc-row--dragging");
+      document.body.style.cursor = "grabbing";
+
+      const clearMarks = () => rows().forEach((r) => r.classList.remove("grocery-loc-row--over", "grocery-loc-row--over-below"));
+
+      const onMove = (ev) => {
+        clearMarks();
+        const all = rows();
+        let idx = all.findIndex((r) => {
+          const box = r.getBoundingClientRect();
+          return ev.clientY >= box.top && ev.clientY <= box.bottom;
+        });
+        if (idx === -1) idx = ev.clientY < all[0].getBoundingClientRect().top ? 0 : all.length - 1;
+        to = idx;
+        if (idx !== from) all[idx].classList.add(idx > from ? "grocery-loc-row--over-below" : "grocery-loc-row--over");
+      };
+
+      const onEnd = () => {
+        document.removeEventListener("pointermove", onMove);
+        document.removeEventListener("pointerup", onEnd);
+        document.removeEventListener("pointercancel", onEnd);
+        document.body.style.cursor = "";
+        row.classList.remove("grocery-loc-row--dragging");
+        clearMarks();
+        moveGroceryLocation(from, to);
+      };
+
+      document.addEventListener("pointermove", onMove);
+      document.addEventListener("pointerup", onEnd);
+      document.addEventListener("pointercancel", onEnd);
+    });
   });
 }
 
@@ -1693,6 +1826,184 @@ function handlePlantDeleteClick() {
 }
 
 /* ---------------------------------------------------------------------
+ * Wishlist (Admin → Wishlist) — future purchases with price, store,
+ * link, extensible type tags, and a running "saved so far" total.
+ * ------------------------------------------------------------------- */
+
+const WishlistItemClass = Parse.Object.extend("WishlistItem");
+let wishlistItems = [];
+let editingWishlistId = null;
+let wishlistSelectedTags = new Set();
+let wishlistNewTags = new Set(); // tags typed into the open modal, not yet saved on any item
+
+function formatMoney(n) {
+  return "$" + (Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+function allWishlistTags() {
+  const set = new Set(CONFIG.WISHLIST_TAGS);
+  wishlistItems.forEach((i) => (i.get("tags") || []).forEach((t) => set.add(t)));
+  wishlistNewTags.forEach((t) => set.add(t));
+  return [...set];
+}
+
+async function loadWishlist() {
+  const listEl = document.getElementById("wishlist-list");
+  listEl.innerHTML = `<div class="loading-row">Loading…</div>`;
+  try {
+    wishlistItems = await new Parse.Query(WishlistItemClass).ascending("name").limit(500).find();
+    renderWishlistList();
+  } catch (err) {
+    console.error(err);
+    listEl.innerHTML = `<div class="empty-state"><p class="empty-state__title">Couldn't load the wishlist.</p></div>`;
+  }
+}
+
+function renderWishlistList() {
+  const listEl = document.getElementById("wishlist-list");
+  if (wishlistItems.length === 0) {
+    listEl.innerHTML = `<p class="admin-missing-empty">Nothing on the wishlist yet — add the first thing you want.</p>`;
+    return;
+  }
+  listEl.innerHTML = wishlistItems
+    .map((item) => {
+      const price = item.get("price") || 0;
+      const saved = item.get("saved") || 0;
+      const pct = price > 0 ? Math.min(100, Math.round((saved / price) * 100)) : 0;
+      const tags = (item.get("tags") || []).map((t) => `<span class="tag-pill">${escapeHtml(t)}</span>`).join("");
+      return `
+      <div class="missing-ingredient-row">
+        <div>
+          <div class="missing-ingredient-row__name">${escapeHtml(item.get("name"))}${item.get("url") ? ` <a href="${escapeHtml(item.get("url"))}" target="_blank" rel="noopener"><i class="fa-solid fa-link"></i></a>` : ""}</div>
+          <div class="missing-ingredient-row__recipes">${tags}${escapeHtml(item.get("store") || "")}</div>
+          <div class="progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><div class="progress__bar" style="width:${pct}%"></div></div>
+          <div class="missing-ingredient-row__recipes">${formatMoney(saved)} of ${formatMoney(price)} (${pct}%)</div>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:0.5rem;">
+          <button type="button" class="btn btn--ghost btn--small" data-edit-wishlist="${item.id}">EDIT</button>
+          <button type="button" class="btn btn--small btn--primary" data-save-wishlist="${item.id}"><i class="fa-solid fa-piggy-bank"></i> ADD SAVINGS</button>
+        </div>
+      </div>`;
+    })
+    .join("");
+
+  listEl.querySelectorAll("[data-edit-wishlist]").forEach((btn) => btn.addEventListener("click", () => openWishlistModal(btn.getAttribute("data-edit-wishlist"))));
+  listEl.querySelectorAll("[data-save-wishlist]").forEach((btn) => btn.addEventListener("click", () => handleAddWishlistSavings(btn.getAttribute("data-save-wishlist"))));
+}
+
+async function handleAddWishlistSavings(id) {
+  const raw = window.prompt("How much did you set aside? (use a negative number to take some back out)");
+  if (raw === null) return;
+  const amount = parseFloat(raw);
+  if (isNaN(amount) || amount === 0) {
+    showToast("Enter a number, like 25 or 12.50.", "error");
+    return;
+  }
+  try {
+    await runAdminCloud("adminAddWishlistSavings", { id, amount });
+    showToast("Savings updated.");
+    await loadWishlist();
+  } catch (err) {
+    console.error(err);
+    showToast(err.message || "Couldn't update savings.", "error");
+  }
+}
+
+function renderWishlistTagSelector() {
+  const container = document.getElementById("wishlist-tag-selector");
+  container.innerHTML = "";
+  allWishlistTags().forEach((tag) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "filter-chip";
+    btn.textContent = tag.toUpperCase();
+    btn.setAttribute("aria-pressed", String(wishlistSelectedTags.has(tag)));
+    btn.addEventListener("click", () => {
+      if (wishlistSelectedTags.has(tag)) wishlistSelectedTags.delete(tag);
+      else wishlistSelectedTags.add(tag);
+      btn.setAttribute("aria-pressed", String(wishlistSelectedTags.has(tag)));
+    });
+    container.appendChild(btn);
+  });
+}
+
+function handleWishlistAddTag() {
+  const input = document.getElementById("wishlist-new-tag");
+  const tag = input.value.trim();
+  if (!tag) return;
+  const existing = allWishlistTags().find((t) => t.toLowerCase() === tag.toLowerCase());
+  const finalTag = existing || tag;
+  if (!existing) wishlistNewTags.add(finalTag);
+  wishlistSelectedTags.add(finalTag);
+  input.value = "";
+  renderWishlistTagSelector();
+}
+
+function openWishlistModal(itemId) {
+  editingWishlistId = itemId || null;
+  const item = itemId ? wishlistItems.find((i) => i.id === itemId) : null;
+  wishlistNewTags = new Set();
+  wishlistSelectedTags = new Set(item ? item.get("tags") || [] : []);
+
+  document.getElementById("wishlist-modal-title").textContent = item ? "Edit wishlist item" : "New wishlist item";
+  document.getElementById("wishlist-name").value = item ? item.get("name") || "" : "";
+  document.getElementById("wishlist-price").value = item && item.get("price") ? item.get("price") : "";
+  document.getElementById("wishlist-saved").value = item && item.get("saved") ? item.get("saved") : "";
+  document.getElementById("wishlist-store").value = item ? item.get("store") || "" : "";
+  document.getElementById("wishlist-url").value = item ? item.get("url") || "" : "";
+  document.getElementById("wishlist-notes").value = item ? item.get("notes") || "" : "";
+  document.getElementById("wishlist-new-tag").value = "";
+  document.getElementById("wishlist-delete-btn").hidden = !item;
+  renderWishlistTagSelector();
+
+  openModal(document.getElementById("wishlist-modal-overlay"));
+}
+
+async function handleWishlistFormSubmit(e) {
+  e.preventDefault();
+  const name = document.getElementById("wishlist-name").value.trim();
+  if (!name) return;
+
+  const payload = {
+    name,
+    price: parseFloat(document.getElementById("wishlist-price").value) || 0,
+    saved: parseFloat(document.getElementById("wishlist-saved").value) || 0,
+    store: document.getElementById("wishlist-store").value.trim(),
+    url: document.getElementById("wishlist-url").value.trim(),
+    notes: document.getElementById("wishlist-notes").value.trim(),
+    tags: [...wishlistSelectedTags],
+  };
+
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+  submitBtn.textContent = "SAVING…";
+  try {
+    await runAdminCloud("adminSaveWishlistItem", { id: editingWishlistId, ...payload });
+    closeModal(document.getElementById("wishlist-modal-overlay"));
+    showToast("Wishlist item saved.");
+    await loadWishlist();
+  } catch (err) {
+    console.error(err);
+    showToast(err.message || "Couldn't save.", "error");
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = "SAVE";
+  }
+}
+
+function handleWishlistDeleteClick() {
+  if (!editingWishlistId) return;
+  const id = editingWishlistId;
+  const item = wishlistItems.find((i) => i.id === id);
+  openConfirmModal("Delete this wishlist item?", `"${item ? item.get("name") : "This item"}" and its savings total will be removed.`, "DELETE", async () => {
+    await runAdminCloud("adminDeleteWishlistItem", { id });
+    showToast("Deleted.");
+    closeModal(document.getElementById("wishlist-modal-overlay"));
+    await loadWishlist();
+  });
+}
+
+/* ---------------------------------------------------------------------
  * Shared confirm modal — used for deletes and for merges. Whatever
  * opened it sets pendingConfirmAction; the confirm button just runs it.
  * ------------------------------------------------------------------- */
@@ -1750,6 +2061,9 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   document.getElementById("item-delete-btn").addEventListener("click", handleItemDeleteClick);
   document.getElementById("item-location-picker-btn").addEventListener("click", openLocationPickerModal);
+  document.getElementById("item-touse").addEventListener("change", (e) => {
+    document.getElementById("item-touse-reason-field").hidden = !e.target.checked;
+  });
   document.getElementById("location-picker-modal-close").addEventListener("click", () => closeModal(document.getElementById("location-picker-modal-overlay")));
   document.getElementById("admin-inventory-search").addEventListener("input", renderAdminInventoryList);
   document.getElementById("inventory-select-all").addEventListener("change", handleInventorySelectAllChange);
@@ -1769,6 +2083,13 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("grocery-location-delete-btn").addEventListener("click", handleGroceryLocationDeleteClick);
 
   document.getElementById("add-plant-btn").addEventListener("click", () => openPlantModal(null));
+
+  document.getElementById("add-wishlist-btn").addEventListener("click", () => openWishlistModal(null));
+  document.getElementById("wishlist-form").addEventListener("submit", handleWishlistFormSubmit);
+  document.getElementById("wishlist-cancel-btn").addEventListener("click", () => closeModal(document.getElementById("wishlist-modal-overlay")));
+  document.getElementById("wishlist-modal-close").addEventListener("click", () => closeModal(document.getElementById("wishlist-modal-overlay")));
+  document.getElementById("wishlist-delete-btn").addEventListener("click", handleWishlistDeleteClick);
+  document.getElementById("wishlist-add-tag-btn").addEventListener("click", handleWishlistAddTag);
   document.getElementById("plant-form").addEventListener("submit", handlePlantFormSubmit);
   document.getElementById("plant-cancel-btn").addEventListener("click", () => closeModal(document.getElementById("plant-modal-overlay")));
   document.getElementById("plant-modal-close").addEventListener("click", () => closeModal(document.getElementById("plant-modal-overlay")));

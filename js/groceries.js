@@ -1,10 +1,9 @@
 /**
  * groceries.js
  * -----------------------------------------------------------------------
- * Powers groceries.html. The list itself is visible to EVERYONE, no PIN
+ * Powers groceries.html. The list itself is visible to EVERYONE, no sign-in
  * needed — that's the point, so it's easy to send a family member a link
- * and have them see what to pick up. The 4-digit PIN (see runGroceryCloud
- * / groceryLogin in parse.js + Cloud Code) only gates adding/editing/
+ * and have them see what to pick up. Adding/editing/
  * checking off items; it's deliberately much lighter than the admin
  * login. Shopping locations (name + emoji + whether they have a bulk bin
  * section) are read here but only editable from Admin → Groceries.
@@ -43,7 +42,6 @@ function showUnlockedView() {
   document.getElementById("grocery-editor-view").hidden = false;
   document.getElementById("grocery-unlock-toggle-btn").hidden = true;
   document.getElementById("grocery-lock-btn").hidden = false;
-  closePinModal();
 }
 
 function showLockedView() {
@@ -54,48 +52,13 @@ function showLockedView() {
 }
 
 function handleUnlockToggleClick() {
-  document.getElementById("grocery-pin-error").classList.remove("admin-error--visible");
-  document.getElementById("grocery-pin-input").value = "";
-  openModal(document.getElementById("grocery-pin-modal-overlay"));
-  document.getElementById("grocery-pin-input").focus();
-}
-
-function closePinModal() {
-  closeModal(document.getElementById("grocery-pin-modal-overlay"));
-}
-
-async function handlePinSubmit(e) {
-  e.preventDefault();
-  const pin = document.getElementById("grocery-pin-input").value.trim();
-  const errorEl = document.getElementById("grocery-pin-error");
-  errorEl.classList.remove("admin-error--visible");
-
-  const submitBtn = e.target.querySelector('button[type="submit"]');
-  submitBtn.disabled = true;
-  submitBtn.textContent = "CHECKING…";
-
-  try {
-    const result = await Parse.Cloud.run("groceryLogin", { pin });
-    if (result && result.token) {
-      setGrocerySession(result.token);
-      document.getElementById("grocery-pin-input").value = "";
-      showUnlockedView();
-      await offerToPromoteLocalChecks();
-    } else {
-      throw new Error("No token returned");
-    }
-  } catch (err) {
-    errorEl.classList.add("admin-error--visible");
-  } finally {
-    submitBtn.disabled = false;
-    submitBtn.textContent = "UNLOCK";
-  }
+  goToAdminSignIn();
 }
 
 function handleLockClick() {
-  clearGrocerySession();
+  clearAdminSession();
   showLockedView();
-  showToast("Locked.");
+  showToast("Signed out.");
 }
 
 /**
@@ -105,9 +68,9 @@ function handleLockClick() {
  */
 function handleGroceryAuthError(err) {
   if (err && err.code === Parse.Error.INVALID_SESSION_TOKEN) {
-    clearGrocerySession();
+    clearAdminSession();
     showLockedView();
-    showToast("Session expired — unlock with the PIN again.", "error");
+    showToast("Session expired. Sign in again to edit.", "error");
     return true;
   }
   return false;
@@ -124,7 +87,7 @@ async function loadGroceryData() {
       new Parse.Query(GroceryItemClass).ascending("category").limit(1000).find(),
       new Parse.Query(InventoryItemClass).ascending("name").limit(2000).find(),
     ]);
-    groceryLocations = locations;
+    groceryLocations = sortGroceryLocations(locations);
     groceryItems = items;
     lowStockItems = inventory.filter((i) => CONFIG.LOW_LEVELS.includes(i.get("level")));
 
@@ -157,6 +120,12 @@ function populateLocationSelect() {
   select.innerHTML = options.join("");
   if ([...select.options].some((o) => o.value === previousValue)) select.value = previousValue;
   updateBulkFieldVisibility();
+}
+
+// Position of a store in the admin-chosen order; "no store" / unknown go last.
+function locationRank(name) {
+  const idx = groceryLocations.findIndex((l) => l.get("name") === name);
+  return idx === -1 ? Number.MAX_SAFE_INTEGER : idx;
 }
 
 function locationLabel(name) {
@@ -290,7 +259,7 @@ function markInventoryItemFinished(inventoryItemId) {
 
 function renderLocationBubbleFilter(containerId, activeSet, locationsInUse, onChange) {
   const container = document.getElementById(containerId);
-  const sorted = [...new Set(locationsInUse)].sort((a, b) => locationLabel(a).localeCompare(locationLabel(b)));
+  const sorted = [...new Set(locationsInUse)].sort((a, b) => locationRank(a) - locationRank(b) || locationLabel(a).localeCompare(locationLabel(b)));
   const chips = [{ key: "__all__", label: "All" }, ...sorted.map((loc) => ({ key: loc, label: locationLabel(loc) }))];
 
   container.innerHTML = chips
@@ -318,7 +287,7 @@ function renderLocationBubbleFilter(containerId, activeSet, locationsInUse, onCh
 /**
  * Copies a link that opens this page pre-filtered to just one store —
  * "the Costco page" you can send to someone without sharing the whole
- * list. Reading the list never needs the PIN, so the link works for
+ * list. Reading the list never needs a sign-in, so the link works for
  * anyone.
  */
 function copyStoreLink(location) {
@@ -333,10 +302,10 @@ function copyStoreLink(location) {
 }
 
 /* ---------------------------------------------------------------------
- * Local "mental checklist" for anyone viewing without the PIN — lets a
+ * Local "mental checklist" for anyone viewing while signed out — lets a
  * family member physically shopping check things off as they go,
  * purely client-side (localStorage, this browser only, never synced).
- * If they later unlock with the PIN, they're offered a one-tap way to
+ * If they later sign in, they're offered a one-tap way to
  * move whatever they checked into the real Checkout pile.
  * ------------------------------------------------------------------- */
 
@@ -363,8 +332,8 @@ function toggleLocalCheck(id) {
 }
 
 /**
- * Called right after a successful PIN unlock. If the person had locally
- * checked anything off while browsing without the PIN, offer to move
+ * Called right after signing in. If the person had locally
+ * checked anything off while browsing while signed out, offer to move
  * those into the real Checkout pile instead of silently losing the
  * selection.
  */
@@ -392,7 +361,7 @@ async function offerToPromoteLocalChecks() {
 }
 
 /* ---------------------------------------------------------------------
- * Read-only view — visible to everyone, no PIN required. Only shows
+ * Read-only view — visible to everyone, no sign-in required. Only shows
  * items still actively needed (not yet bought/checked off).
  * ------------------------------------------------------------------- */
 
@@ -425,7 +394,7 @@ function renderReadonlyList() {
     byLocation.get(key).push(item);
   });
 
-  const sections = Array.from(byLocation.entries()).sort(([a], [b]) => locationLabel(a).localeCompare(locationLabel(b)));
+  const sections = Array.from(byLocation.entries()).sort(([a], [b]) => locationRank(a) - locationRank(b) || locationLabel(a).localeCompare(locationLabel(b)));
 
   container.innerHTML = sections
     .map(([location, locationItems]) => {
@@ -497,7 +466,7 @@ function renderAddList() {
     byLocation.get(key).push(item);
   });
 
-  const sections = Array.from(byLocation.entries()).sort(([a], [b]) => locationLabel(a).localeCompare(locationLabel(b)));
+  const sections = Array.from(byLocation.entries()).sort(([a], [b]) => locationRank(a) - locationRank(b) || locationLabel(a).localeCompare(locationLabel(b)));
 
   container.innerHTML = sections
     .map(([location, locationItems]) => {
@@ -907,8 +876,6 @@ document.addEventListener("DOMContentLoaded", () => {
   initGroceryTabs();
   setupLowStockToggle();
   document.getElementById("grocery-unlock-toggle-btn").addEventListener("click", handleUnlockToggleClick);
-  document.getElementById("grocery-pin-modal-close").addEventListener("click", closePinModal);
-  document.getElementById("grocery-pin-form").addEventListener("submit", handlePinSubmit);
   document.getElementById("grocery-lock-btn").addEventListener("click", handleLockClick);
   document.getElementById("grocery-add-form").addEventListener("submit", handleAddFormSubmit);
   document.getElementById("grocery-add-cancel-edit-btn").addEventListener("click", cancelEditingGroceryItem);
@@ -935,5 +902,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const storeParam = new URLSearchParams(window.location.search).get("store");
   if (storeParam) activeReadonlyLocations = new Set([storeParam]);
 
-  loadGroceryData();
+  // If you were browsing signed out and checked things off, offer to move them to checkout after signing in.
+  loadGroceryData().then(() => {
+    if (isGroceryUnlocked()) offerToPromoteLocalChecks();
+  });
 });

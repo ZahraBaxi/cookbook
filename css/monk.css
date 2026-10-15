@@ -1,0 +1,1603 @@
+/**
+ * monk.css — styles for the Today, Practice and Growth pages.
+ * Uses the Common Place design tokens, so css/styles.css loads first.
+ */
+
+/* Scoped tokens: map the notebook onto the site design system. */
+.monk-wrap {
+  --ink: var(--color-text);
+  --paper: var(--color-bg);
+  --line: var(--color-border-strong);
+  --faint: var(--color-text-secondary);
+  --max-width: 700px;
+}
+
+/* ---------- sidebar (desktop) / top menu (mobile) ---------- */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* ---------- main content ---------- */
+
+.monk-main {
+  flex: 1;
+  padding: 56px 32px 120px;
+  display: flex;
+  justify-content: center;
+}
+
+.monk-content {
+  width: 100%;
+  max-width: var(--max-width);
+}
+
+.monk-section {
+  display: none;
+}
+
+.monk-section.active {
+  display: block;
+}
+
+.monk-eyebrow {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin: 0 0 6px 0;
+}
+
+.monk-h1 {
+  font-weight: 600;
+  font-size: 1.7rem;
+  margin: 0 0 28px 0;
+}
+
+.monk-h2 {
+  font-weight: 600;
+  font-size: 1.1rem;
+  margin: 40px 0 16px 0;
+}
+
+.monk-h3 {
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--faint);
+  margin: 20px 0 10px 0;
+}
+
+.monk-lede {
+  font-weight: 400;
+  font-size: 0.95rem;
+  color: #333;
+  margin: 0 0 8px 0;
+}
+
+/* ---------- home ---------- */
+
+.monk-home-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin: 0 0 6px 0;
+}
+
+.monk-home-value {
+  font-size: 1rem;
+  font-weight: 400;
+}
+
+.monk-quote {
+  font-size: 1.1rem;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 1.5;
+  margin: 0 0 10px 0;
+}
+
+/* primary: the vow card. Largest, boldest thing on the page;
+   inverts to solid ink once kept, as the day's one visible reward. */
+
+.monk-hero {
+  border: 1px solid var(--line);
+  padding: 32px 28px;
+  margin: 0 0 40px 0;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+.monk-hero-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  margin: 0 0 14px 0;
+}
+
+.monk-hero-text {
+  font-size: 1.35rem;
+  font-weight: 400;
+  line-height: 1.4;
+  margin: 0 0 24px 0;
+}
+
+.monk-hero.kept {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.monk-hero.kept .monk-btn.primary {
+  background: var(--paper);
+  color: var(--ink);
+  border-color: var(--paper);
+  opacity: 1;
+  cursor: default;
+}
+
+/* primary: today's question, reflection, not a task */
+
+.monk-question-block {
+  border: 1px solid var(--line);
+  padding: 32px 28px 28px;
+  margin: 0 0 40px 0;
+}
+
+.monk-question-text {
+  font-size: 1.05rem;
+  font-weight: 400;
+  line-height: 1.55;
+  margin: 14px 0 20px 0;
+}
+
+.monk-question-actions {
+  display: flex;
+  gap: 24px;
+}
+
+#home-question-reflect {
+  margin-top: 22px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 20px;
+}
+
+/* secondary: streak, a quiet row of filled/hollow days */
+
+.monk-streak-block {
+  margin: 0 0 32px 0;
+}
+
+.monk-streak-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 0 0 10px 0;
+}
+
+.monk-streak-row {
+  display: flex;
+  gap: 6px;
+}
+
+.monk-streak-dot {
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--ink);
+}
+
+.monk-streak-dot.filled { background: var(--ink); }
+
+.monk-streak-dot.today { border-width: 2px; }
+
+/* tertiary: quote, with a low-emphasis text-link to cycle it */
+
+.monk-quote-block {
+  border-top: 1px solid var(--line);
+  padding: 24px 0;
+  margin: 0 0 32px 0;
+}
+
+.monk-quiet-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+  text-decoration: underline;
+  color: var(--ink);
+  opacity: 0.5;
+  cursor: pointer;
+  transition: opacity 0.25s ease;
+}
+
+.monk-quiet-link:hover { opacity: 1; }
+
+/* tertiary: reminders, tucked at the bottom, double as a Rhythm shortcut */
+
+.monk-reminder-row {
+  display: flex;
+  gap: 14px;
+}
+
+.monk-reminder {
+  flex: 1;
+  text-align: left;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  padding: 16px;
+  cursor: pointer;
+  font-family: var(--font-body);
+  color: var(--ink);
+  transition: opacity 0.25s ease;
+}
+
+.monk-reminder:hover { opacity: 0.6; }
+
+.monk-reminder span:last-child {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 400;
+  margin-top: 4px;
+}
+
+/* ---------- checklists ---------- */
+
+.monk-checklist {
+  list-style: none;
+  margin: 0 0 32px 0;
+  padding: 0;
+}
+
+.monk-checklist li {
+  border-top: 1px solid var(--line);
+  padding: 10px 0;
+}
+
+.monk-checklist li:last-child { border-bottom: 1px solid var(--line); }
+
+.monk-checklist label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-size: 0.92rem;
+}
+
+.monk-checklist input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--ink);
+  flex-shrink: 0;
+  cursor: pointer;
+  position: relative;
+}
+
+.monk-checklist input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 8px;
+  height: 8px;
+  background: var(--ink);
+}
+
+.monk-checklist input[type="checkbox"]:checked + span {
+  text-decoration: line-through;
+  color: var(--faint);
+}
+
+/* ---------- buttons ---------- */
+
+.monk-btn {
+  display: inline-block;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--ink);
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 0.85rem;
+  padding: 10px 20px;
+  cursor: pointer;
+  opacity: 1;
+  transition: opacity 0.25s ease;
+}
+
+.monk-btn:hover { opacity: 0.6; }
+
+.monk-btn.primary {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* ---------- prompt / practice cards ---------- */
+
+.monk-card {
+  border: 1px solid var(--line);
+  padding: 32px 28px;
+  margin: 20px 0;
+}
+
+.monk-card .monk-prompt {
+  font-size: 1.2rem;
+  font-weight: 400;
+  margin: 0 0 20px 0;
+}
+
+.monk-card-list {
+  margin: 0 0 20px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.monk-card-list li {
+  padding: 6px 0;
+  font-size: 0.9rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.monk-card-list li:first-child { border-top: none; }
+
+.monk-card-list .monk-card-label {
+  display: inline-block;
+  width: 110px;
+  color: var(--faint);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ---------- forms ---------- */
+
+.monk-textarea, .monk-input, .monk-select {
+  width: 100%;
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 0.9rem;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+
+.monk-textarea { min-height: 110px; resize: vertical; }
+
+/* ---------- lists / entries ---------- */
+
+.monk-entry {
+  border-top: 1px solid var(--line);
+  padding: 14px 0;
+}
+
+.monk-entry:last-child { border-bottom: 1px solid var(--line); }
+
+.monk-entry-date {
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin: 0 0 6px 0;
+}
+
+.monk-entry-body { font-size: 0.92rem; white-space: pre-wrap; }
+
+.monk-empty {
+  color: var(--faint);
+  font-size: 0.85rem;
+  font-style: normal;
+  padding: 12px 0;
+}
+
+/* ---------- plants: stage stepper ---------- */
+
+.monk-plant-card {
+  border: 1px solid var(--line);
+  padding: 22px 24px;
+  margin: 0 0 16px 0;
+}
+
+.monk-plant-name {
+  font-weight: 600;
+  font-size: 1rem;
+  margin: 0 0 2px 0;
+}
+
+.monk-plant-species {
+  font-size: 0.78rem;
+  color: var(--faint);
+  margin: 0 0 16px 0;
+}
+
+.monk-stage-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.monk-stage-seg {
+  flex: 1;
+  height: 4px;
+  background: var(--faint);
+}
+
+.monk-stage-seg.filled { background: var(--ink); }
+
+.monk-stage-label-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.64rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin-bottom: 18px;
+}
+
+.monk-plant-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* ---------- watchlist rows (checklist + a remove link) ---------- */
+
+.monk-checklist li.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.monk-checklist li.row label { flex: 1; }
+
+/* ---------- category groups (craft / learning) ---------- */
+
+.monk-group {
+  margin-bottom: 28px;
+}
+
+.monk-group-title {
+  font-weight: 600;
+  font-size: 0.85rem;
+  margin: 0 0 10px 0;
+}
+
+.monk-tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.monk-tag {
+  border: 1px solid var(--line);
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  background: var(--paper);
+  transition: opacity 0.25s ease;
+}
+
+.monk-tag:hover { opacity: 0.55; }
+
+.monk-tag.done {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* ---------- attention counters ---------- */
+
+.monk-counter-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 28px;
+}
+
+.monk-counter-btn {
+  flex: 1;
+  min-width: 160px;
+  border: 1px solid var(--line);
+  padding: 18px;
+  background: var(--paper);
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-body);
+  transition: opacity 0.25s ease;
+}
+
+.monk-counter-btn:hover { opacity: 0.6; }
+
+.monk-counter-btn .n {
+  display: block;
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+.monk-counter-btn .label {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--faint);
+  margin-top: 6px;
+}
+
+/* ---------- progress bars ---------- */
+
+.monk-progress-row {
+  border-top: 1px solid var(--line);
+  padding: 16px 0;
+}
+
+.monk-progress-row:last-child { border-bottom: 1px solid var(--line); }
+
+.monk-progress-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  margin-bottom: 8px;
+}
+
+.monk-progress-track {
+  width: 100%;
+  height: 2px;
+  background: var(--faint);
+}
+
+.monk-progress-fill {
+  height: 2px;
+  background: var(--ink);
+}
+
+/* ---------- modal (used for sourdough recipe popups) ---------- */
+
+.monk-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 100;
+}
+
+.monk-modal {
+  position: relative;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  max-width: 480px;
+  width: 100%;
+  max-height: 84vh;
+  overflow-y: auto;
+  padding: 36px 30px 30px;
+}
+
+.monk-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  background: none;
+  border: none;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--ink);
+  padding: 4px;
+}
+
+.monk-modal-close:hover { opacity: 0.5; }
+
+.monk-modal h2 {
+  font-weight: 600;
+  font-size: 1.25rem;
+  margin: 0 0 20px 0;
+  padding-right: 24px;
+}
+
+.monk-modal h3 {
+  font-weight: 600;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin: 20px 0 10px 0;
+}
+
+.monk-modal ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.9rem;
+}
+
+.monk-modal ul li { margin-bottom: 6px; }
+
+.monk-modal ol {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 0.9rem;
+}
+
+.monk-modal ol li { margin-bottom: 10px; }
+
+.monk-modal-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 28px;
+  flex-wrap: wrap;
+}
+
+/* ---------- reading: book shelf + annotations ---------- */
+
+.monk-book-card {
+  border: 1px solid var(--line);
+  margin-bottom: 14px;
+}
+
+.monk-book-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  font-family: var(--font-body);
+  color: var(--ink);
+}
+
+.monk-book-header:hover { opacity: 0.75; }
+
+.monk-book-titles { flex: 1; min-width: 0; }
+
+.monk-book-title { font-weight: 600; font-size: 0.98rem; margin: 0; }
+
+.monk-book-author { font-size: 0.78rem; color: var(--faint); margin: 2px 0 0 0; }
+
+.monk-book-status {
+  flex-shrink: 0;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.monk-book-status.finished { background: var(--ink); color: var(--paper); }
+
+.monk-book-chevron {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  color: var(--faint);
+  transition: transform 0.2s ease;
+}
+
+.monk-book-card.open .monk-book-chevron { transform: rotate(90deg); }
+
+.monk-book-body {
+  display: none;
+  padding: 4px 20px 22px;
+  border-top: 1px solid var(--color-border);
+}
+
+.monk-book-card.open .monk-book-body { display: block; }
+
+.monk-annotation-form {
+  padding-top: 18px;
+}
+
+.monk-annotation-form textarea,
+.monk-annotation-form input {
+  margin-bottom: 10px;
+}
+
+.monk-annotation {
+  border-left: 2px solid var(--ink);
+  padding: 2px 0 2px 16px;
+  margin: 18px 0;
+}
+
+.monk-annotation-quote {
+  font-style: italic;
+  font-size: 0.94rem;
+  line-height: 1.5;
+  margin: 0 0 6px 0;
+}
+
+.monk-annotation-quote::before { content: "\201C"; }
+.monk-annotation-quote::after { content: "\201D"; }
+
+.monk-annotation-meta {
+  font-size: 0.7rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin: 0 0 8px 0;
+}
+
+.monk-annotation-note {
+  font-size: 0.88rem;
+  color: #222;
+  margin: 0 0 8px 0;
+  white-space: pre-wrap;
+}
+
+.monk-book-remove {
+  margin-top: 8px;
+}
+
+/* ---------- wishlist ---------- */
+
+.monk-rate-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.monk-rate-row span {
+  font-size: 0.95rem;
+}
+
+.monk-rate-row .monk-input {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.monk-wish-card {
+  border: 1px solid var(--line);
+  padding: 22px 24px;
+  margin-bottom: 16px;
+}
+
+.monk-wish-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.monk-wish-name { font-weight: 600; font-size: 1rem; margin: 0; }
+
+.monk-wish-price { font-size: 0.95rem; color: var(--faint); white-space: nowrap; }
+
+.monk-wish-note {
+  font-size: 0.85rem;
+  color: #333;
+  margin: 4px 0 16px 0;
+}
+
+.monk-wish-checks {
+  list-style: none;
+  margin: 0 0 16px 0;
+  padding: 0;
+}
+
+.monk-wish-checks li { padding: 4px 0; }
+
+.monk-wish-checks label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.monk-wish-checks input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 15px;
+  height: 15px;
+  border: 1px solid var(--ink);
+  flex-shrink: 0;
+  cursor: pointer;
+  position: relative;
+}
+
+.monk-wish-checks input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 7px;
+  height: 7px;
+  background: var(--ink);
+}
+
+.monk-wish-wait {
+  font-size: 0.8rem;
+  color: var(--faint);
+  margin: 0 0 6px 0;
+}
+
+.monk-wish-wait.ready {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.monk-wish-track {
+  width: 100%;
+  height: 2px;
+  background: var(--faint);
+  margin-bottom: 16px;
+}
+
+.monk-wish-fill {
+  height: 2px;
+  background: var(--ink);
+}
+
+.monk-wish-actions {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+/* ---------- dharma: sitting timer, breathing circle, mala ---------- */
+
+.monk-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  margin-top: 18px;
+}
+
+.monk-toggle-row input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 15px;
+  height: 15px;
+  border: 1px solid var(--ink);
+  flex-shrink: 0;
+  cursor: pointer;
+  position: relative;
+}
+
+.monk-toggle-row input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 7px;
+  height: 7px;
+  background: var(--ink);
+}
+
+.monk-breath-wrap {
+  display: flex;
+  justify-content: center;
+  margin: 34px 0 22px;
+}
+
+.monk-breath-circle {
+  width: 130px;
+  height: 130px;
+  border: 1px solid var(--ink);
+  border-radius: 50%;
+}
+
+.monk-breath-circle.running {
+  animation: monkBreathe 8s ease-in-out infinite;
+}
+
+@keyframes monkBreathe {
+  0%, 100% { transform: scale(0.72); opacity: 0.55; }
+  50% { transform: scale(1); opacity: 1; }
+}
+
+.monk-sit-instruction {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--faint);
+  margin: 0 0 8px 0;
+}
+
+.monk-sit-timer {
+  text-align: center;
+  font-family: var(--font-body);
+  font-size: 2.4rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  margin: 0 0 22px 0;
+}
+
+#dharma-sit-active .monk-btn {
+  display: block;
+  margin: 0 auto;
+}
+
+.monk-mala-card {
+  text-align: center;
+}
+
+.monk-mala-counter {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin: 0 auto 18px;
+  font-family: var(--font-body);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.monk-mala-counter:active { opacity: 0.6; }
+
+.monk-mala-counter.complete {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.monk-mala-n {
+  font-size: 2.2rem;
+  font-weight: 600;
+}
+
+.monk-mala-label {
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: inherit;
+  opacity: 0.6;
+  margin-top: 4px;
+}
+
+/* ---------- auth screen ---------- */
+
+
+
+
+
+
+
+
+
+/* ---------- learning: nested notebook ---------- */
+
+.monk-kb-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 18px 0 16px;
+}
+
+.monk-kb-breadcrumb {
+  font-size: 0.82rem;
+  color: var(--faint);
+}
+
+.monk-kb-breadcrumb button {
+  background: none;
+  border: none;
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  color: var(--ink);
+  cursor: pointer;
+  padding: 0;
+}
+.monk-kb-breadcrumb button:hover { opacity: 0.6; }
+.monk-kb-breadcrumb .sep { color: var(--faint); margin: 0 6px; }
+
+.monk-kb-actions { display: flex; gap: 10px; }
+
+.monk-kb-web {
+  border: 1px solid var(--line);
+  margin-bottom: 20px;
+  height: 480px;
+  overflow: auto;
+}
+
+.monk-kb-web svg {
+  display: block;
+}
+
+.monk-kb-web svg text {
+  font-family: var(--font-body);
+  font-size: 11px;
+  fill: var(--ink);
+}
+.monk-kb-web svg circle { fill: var(--paper); stroke: var(--ink); stroke-width: 1; }
+.monk-kb-web svg line { stroke: var(--faint); stroke-width: 1; }
+
+/* every folder/note/photo/sketch node in the web */
+.kb-node circle { cursor: grab; touch-action: none; }
+.kb-node:active circle { cursor: grabbing; }
+.kb-node:hover circle { opacity: 0.6; }
+.kb-node.current circle { fill: var(--ink); }
+.kb-node-folder circle { stroke-width: 1.5; }
+
+.kb-node-badge {
+  font-size: 9px;
+  fill: var(--faint);
+}
+
+.kb-node-remove {
+  font-size: 13px;
+  fill: var(--faint);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.kb-node:hover .kb-node-remove { opacity: 1; }
+.kb-node-remove:hover { fill: var(--ink); }
+
+/* photo nodes: an actual thumbnail, ringed with a thin stroke
+   instead of the filled/stroked default circle underneath it */
+.kb-node-photo-ring { fill: none !important; stroke: var(--ink); stroke-width: 1; }
+.kb-node-photo image { cursor: grab; touch-action: none; }
+.kb-node-photo:active image { cursor: grabbing; }
+.kb-node-photo:hover .kb-node-photo-ring { opacity: 0.6; }
+
+/* note nodes: the full sticky note, not a dot -- solid black,
+   white text, sized to whatever it actually contains */
+.kb-node-sticky {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 8px 9px;
+  font-family: var(--font-body);
+  cursor: grab;
+  touch-action: none;
+  overflow: hidden;
+}
+.kb-node-note:active .kb-node-sticky { cursor: grabbing; }
+.kb-node-note:hover .kb-node-sticky { opacity: 0.85; }
+.kb-node-sticky-title {
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  word-wrap: break-word;
+}
+.kb-node-sticky-body {
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+.kb-node-remove-sticky { fill: var(--paper); }
+.kb-node-note:hover .kb-node-remove-sticky { opacity: 1; }
+.kb-node-remove-sticky:hover { fill: var(--paper); opacity: 1 !important; }
+
+/* note editor / photo viewer, both rendered inside the shared modal */
+.monk-kb-note-title,
+.monk-kb-note-body {
+  margin-bottom: 12px;
+}
+.monk-kb-photo-full {
+  width: 100%;
+  max-height: 60vh;
+  object-fit: contain;
+  margin-bottom: 14px;
+}
+.monk-kb-color-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+  margin-bottom: 18px;
+}
+
+/* ---------- sketch overlay ---------- */
+
+.monk-sketch-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 150;
+}
+
+.monk-sketch-card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  padding: 18px;
+  max-width: 640px;
+  width: 100%;
+}
+
+.monk-sketch-title {
+  margin-bottom: 14px;
+}
+
+.monk-sketch-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.monk-sketch-tool {
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.monk-sketch-tool.active { background: var(--ink); color: var(--paper); }
+
+.monk-sketch-thickness {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--faint);
+}
+
+.monk-sketch-canvas {
+  width: 100%;
+  height: 400px;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  display: block;
+  touch-action: none;
+}
+.monk-sketch-canvas.tool-pen { cursor: crosshair; }
+.monk-sketch-canvas.tool-eraser { cursor: cell; }
+
+/* ---------- calendar ---------- */
+
+.monk-cal-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.monk-cal-viewswitch {
+  display: flex;
+  border: 1px solid var(--ink);
+}
+.monk-cal-viewswitch button {
+  background: var(--paper);
+  color: var(--ink);
+  border: none;
+  border-right: 1px solid var(--ink);
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 0.8rem;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+.monk-cal-viewswitch button:last-child { border-right: none; }
+.monk-cal-viewswitch button.active { background: var(--ink); color: var(--paper); }
+.monk-cal-viewswitch button:hover:not(.active) { opacity: 0.6; }
+
+.monk-cal-nav { display: flex; gap: 8px; }
+.monk-cal-nav .monk-btn { padding: 8px 14px; }
+
+.monk-cal-label {
+  font-weight: 600;
+  font-size: 1rem;
+  margin: 0;
+  flex: 1;
+}
+
+#cal-new-event { margin-left: auto; }
+
+/* month grid: a clean dot per day, no boxes or borders. filled
+   solid means something's on it, a thin ring means today, plain
+   means empty -- click any day to open its agenda */
+.monk-cal-month-dow, .monk-cal-month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+.monk-cal-month-dow div {
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--faint);
+  text-align: center;
+  padding: 0 0 10px 0;
+}
+
+.monk-cal-month-grid { row-gap: 10px; }
+
+.monk-cal-day {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 0;
+  cursor: pointer;
+}
+.monk-cal-day-dot {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.88rem;
+}
+.monk-cal-day:hover .monk-cal-day-dot { opacity: 0.6; }
+.monk-cal-day.outside .monk-cal-day-dot { color: var(--faint); }
+
+/* today: a ring, nothing more */
+.monk-cal-day.today .monk-cal-day-dot { border-color: var(--ink); }
+
+/* the brief, as a dot instead of a box: any day with something on
+   it goes solid black with white text */
+.monk-cal-day.has-events .monk-cal-day-dot { background: var(--ink); color: var(--paper); }
+.monk-cal-day.has-events.outside .monk-cal-day-dot { opacity: 0.45; }
+
+.monk-cal-daynum { font-size: 0.85rem; }
+
+/* week view */
+.monk-cal-week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+}
+.monk-cal-weekcol { border-right: 1px solid var(--line); min-height: 220px; }
+.monk-cal-weekhead {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.monk-cal-weekhead span:first-child {
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.monk-cal-weekhead .monk-cal-daynum { font-size: 1.05rem; }
+.monk-cal-weekcol.today .monk-cal-weekhead .monk-cal-daynum {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.monk-cal-weekhead.has-events { background: var(--ink); color: var(--paper); }
+.monk-cal-weekbody { padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+
+.monk-cal-event {
+  cursor: pointer;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+}
+.monk-cal-event:hover { opacity: 0.7; }
+.monk-cal-event-time {
+  display: block;
+  font-size: 0.66rem;
+  color: var(--faint);
+  letter-spacing: 0.03em;
+}
+.monk-cal-event-title { display: block; font-size: 0.85rem; }
+.monk-cal-event-notes { font-size: 0.8rem; color: var(--faint); margin: 6px 0 0 0; white-space: pre-wrap; }
+
+.monk-cal-addlink {
+  background: none;
+  border: none;
+  color: var(--faint);
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  padding: 4px 0;
+  cursor: pointer;
+  text-align: left;
+}
+.monk-cal-addlink:hover { color: var(--ink); }
+
+/* day view: a plain agenda list */
+.monk-cal-day-agenda .monk-cal-event { padding: 14px 16px; margin-bottom: 10px; }
+.monk-cal-day-agenda .monk-cal-event-time { font-size: 0.72rem; }
+.monk-cal-day-agenda .monk-cal-event-title { font-size: 1rem; margin-top: 2px; }
+
+/* year view: every month's calendar, side by side */
+.monk-cal-year {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 24px 18px;
+}
+.monk-cal-yearmonth-title {
+  font-weight: 600;
+  font-size: 0.82rem;
+  margin: 0 0 8px 0;
+  cursor: pointer;
+}
+.monk-cal-yearmonth-title:hover { opacity: 0.6; }
+.monk-cal-yearmonth-dow {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 2px;
+}
+.monk-cal-yearmonth-dow span {
+  font-size: 0.55rem;
+  color: var(--faint);
+  text-align: center;
+}
+.monk-cal-yearmonth-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  row-gap: 3px;
+}
+.monk-cal-yday {
+  width: 100%;
+  aspect-ratio: 1;
+  max-width: 20px;
+  margin: 0 auto;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.56rem;
+  cursor: pointer;
+}
+.monk-cal-yday.outside { color: var(--faint); }
+.monk-cal-yday.today { border-color: var(--ink); }
+.monk-cal-yday.has-events { background: var(--ink); color: var(--paper); }
+.monk-cal-yday:hover { opacity: 0.6; }
+
+.monk-cal-modal-row { display: flex; gap: 8px; }
+.monk-cal-modal-row .monk-input { flex: 1; }
+
+#cal-ev-map-link { display: inline-block; margin: -8px 0 16px 0; }
+
+.monk-cal-allday-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  margin: 0 0 16px 0;
+  cursor: pointer;
+}
+.monk-cal-allday-toggle input { margin: 0; }
+
+.monk-cal-modal-label {
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin: 0 0 6px 0;
+}
+
+.monk-cal-event-location {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--faint);
+  margin-top: 2px;
+}
+.monk-cal-event.all-day .monk-cal-event-time {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* day view: a big date up top, the way a wall calendar reads,
+   before the actual agenda underneath it */
+.monk-cal-day-hero {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  margin-bottom: 28px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--line);
+}
+.monk-cal-day-hero-num {
+  font-weight: 600;
+  font-size: 4.4rem;
+  line-height: 1;
+}
+.monk-cal-day-hero-dow {
+  font-size: 0.9rem;
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.monk-inline-add {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.monk-inline-add .monk-input { flex: 1; margin-bottom: 0; }
+
+.monk-rhythm-item { user-select: none; }
+.monk-drag-handle {
+  color: var(--faint);
+  font-size: 0.85rem;
+  letter-spacing: -2px;
+  cursor: grab;
+  touch-action: none;
+  padding-right: 2px;
+}
+.monk-rhythm-item.dragging { opacity: 0.4; }
+.monk-rhythm-item.dragging .monk-drag-handle { cursor: grabbing; }
+
+.monk-bookmark-list {
+  list-style: none;
+  margin: 0 0 16px 0;
+  padding: 0;
+}
+.monk-bookmark-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.monk-bookmark-list li:last-child { border-bottom: 1px solid var(--line); }
+.monk-bookmark-list a {
+  flex: 1;
+  font-size: 0.92rem;
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--color-border);
+}
+.monk-bookmark-list a:hover { border-bottom-color: var(--ink); }
+
+.monk-bookmark-add { display: flex; gap: 8px; margin-bottom: 20px; }
+.monk-bookmark-add .monk-input { margin-bottom: 0; }
+.monk-bookmark-add input:first-child { flex: 0 0 130px; }
+.monk-bookmark-add input:last-of-type { flex: 1; }
+
+.monk-kanban {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.monk-kanban-col {
+  border: 1px solid var(--line);
+  padding: 14px;
+}
+.monk-kanban-body {
+  min-height: 40px;
+  margin-bottom: 12px;
+}
+.monk-kanban-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+  user-select: none;
+}
+.monk-kanban-body .monk-kanban-card:last-child { border-bottom: 1px solid var(--line); }
+.monk-kanban-card-text { flex: 1; font-size: 0.86rem; word-break: break-word; }
+.monk-kanban-card.dragging { opacity: 0.4; }
+.monk-kanban-card.dragging .monk-drag-handle { cursor: grabbing; }
+
+.monk-giveaway-text { flex: 1; }
+.monk-giveaway-actions { display: flex; gap: 12px; }
+
+@media (max-width: 780px) {
+  .monk-kanban { grid-template-columns: 1fr; }
+}
+
+/* ---------- utility ---------- */
+
+.monk-note {
+  font-size: 0.78rem;
+  color: var(--faint);
+  margin-top: 24px;
+}
+
+
+
+/* =====================================================================
+   Common Place integration
+   ===================================================================== */
+
+.page-header--compact { padding: 2.5rem 0 1.75rem; }
+.page-header--compact h1 { font-size: clamp(2rem, 6vw, var(--step-xl)); }
+
+.monk-wrap { padding: 0 0 1rem; }
+.monk-shell { display: block; min-height: 0; }
+.monk-main { padding: 0; min-width: 0; display: block; }
+
+/* Section tabs, in the same style as the site's filter chips */
+.monk-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 2.25rem;
+  padding: 0 0 1.25rem;
+  border-bottom: 1px solid var(--color-border);
+}
+.monk-tabs button {
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: var(--step-caption);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.5rem 0.9rem;
+  min-height: 40px;
+  cursor: pointer;
+}
+.monk-tabs button:hover, .monk-tabs button.active { background: var(--color-text); color: var(--color-bg); }
+
+/* Shown instead of the notebook when not signed in on Admin */
+.monk-gate { border: 1px solid var(--color-border); padding: 0.9rem 1.25rem; margin: 0 0 1.5rem; font-size: var(--step-small); }
+.monk-gate[hidden] { display: none; }
+.monk-gate__title { font-family: var(--font-display); font-weight: 600; font-size: var(--step-medium); margin: 0 0 0.5rem; }
+.monk-gate a { text-decoration: underline; }
+
+.monk-eyebrow, .monk-home-label {
+  font-size: var(--step-caption);
+  letter-spacing: 0.14em;
+  color: var(--color-text-secondary);
+}
+.monk-h1 { font-size: var(--step-large); letter-spacing: -0.01em; text-transform: uppercase; }
+.monk-h2 { font-size: var(--step-medium); }
+.monk-lede { color: var(--color-text-secondary); }
+
+/* Buttons: same look as .btn */
+.monk-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-bg);
+  color: var(--color-text);
+  padding: 0.7rem 1.4rem;
+  min-height: 44px;
+  font-size: var(--step-caption);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  opacity: 1;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.monk-btn:hover { opacity: 1; background: var(--color-text); color: var(--color-bg); }
+.monk-btn.primary { background: var(--color-text); color: var(--color-bg); }
+.monk-btn.primary:hover { background: #333; }
+.monk-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Inputs: same look as the site's fields */
+.monk-textarea, .monk-input, .monk-select {
+  border: 1px solid var(--color-border);
+  padding: 0.65rem 0.75rem;
+  font-size: var(--step-base);
+}
+.monk-textarea:focus, .monk-input:focus, .monk-select:focus { border-color: var(--color-text); outline: none; }
+
+/* Popup: same look as .modal */
+.monk-modal-overlay { background: var(--color-overlay); align-items: flex-start; overflow-y: auto; padding: 4vh 1rem; }
+.monk-modal { border: 1px solid var(--color-border-strong); max-height: none; padding: 2.25rem; }
+.monk-modal h2 { font-size: var(--step-large); letter-spacing: -0.01em; }
+
+input[type="checkbox"], input[type="radio"] { accent-color: var(--color-text); }

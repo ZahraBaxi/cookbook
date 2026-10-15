@@ -43,58 +43,30 @@ async function runAdminCloud(name, params = {}) {
 }
 
 /**
- * Same idea as the admin session helpers above, but for the grocery
- * list's 4-digit PIN gate — a much lighter-weight, low-stakes check
- * meant to keep casual visitors out, not withstand a determined
- * attacker (same spirit as the housewarming site's shared password).
- * Uses localStorage rather than sessionStorage so it survives closing
- * the browser/app on a phone at the store.
+ * One sign-in for the whole site. These keep the grocery and inventory
+ * pages working off the same admin session as everything else.
  */
-function getGroceryToken() {
-  return localStorage.getItem(CONFIG.GROCERY_TOKEN_KEY) || null;
-}
-
 function isGroceryUnlocked() {
-  return !!getGroceryToken();
-}
-
-function setGrocerySession(token) {
-  localStorage.setItem(CONFIG.GROCERY_TOKEN_KEY, token);
-}
-
-function clearGrocerySession() {
-  localStorage.removeItem(CONFIG.GROCERY_TOKEN_KEY);
+  return isAdminLoggedIn();
 }
 
 async function runGroceryCloud(name, params = {}) {
-  const token = getGroceryToken();
-  return Parse.Cloud.run(name, { ...params, groceryToken: token });
-}
-
-/**
- * Same idea again, this time for quick-editing Inventory items (update
- * quantity/level, move location/shelf, or delete when finished) without
- * a full admin login — meant for scanning a QR code on a shelf and
- * fixing that one item's status in a couple of taps. Deliberately a
- * SEPARATE PIN from groceries, since this touches real stock data.
- */
-function getInventoryToken() {
-  return localStorage.getItem(CONFIG.INVENTORY_TOKEN_KEY) || null;
+  return runAdminCloud(name, params);
 }
 
 function isInventoryUnlocked() {
-  return !!getInventoryToken();
-}
-
-function setInventorySession(token) {
-  localStorage.setItem(CONFIG.INVENTORY_TOKEN_KEY, token);
-}
-
-function clearInventorySession() {
-  localStorage.removeItem(CONFIG.INVENTORY_TOKEN_KEY);
+  return isAdminLoggedIn();
 }
 
 async function runInventoryCloud(name, params = {}) {
-  const token = getInventoryToken();
-  return Parse.Cloud.run(name, { ...params, inventoryToken: token });
+  return runAdminCloud(name, params);
+}
+
+/**
+ * Sends the person to the Admin sign-in and brings them straight back to
+ * this page (including any ?query like ?item=...) once they are signed in.
+ */
+function goToAdminSignIn() {
+  const here = window.location.pathname.split("/").pop() + window.location.search + window.location.hash;
+  window.location.href = "admin.html?return=" + encodeURIComponent(here);
 }

@@ -14,12 +14,12 @@ const CONFIG = {
   PARSE_SERVER_URL: "https://parseapi.back4app.com/",
 
   // Site copy — change wording here and it updates everywhere.
-  SITE_TITLE: "Zahra's Space",
-  HOME_SUBTITLE: "My digital inventory & lists for my home.",
+  SITE_TITLE: "Common Place",
+  HOME_SUBTITLE: "Everything for home, in one place.",
   COOKBOOK_SUBTITLE: "Recipes from my kitchen.",
   INVENTORY_SUBTITLE: "What's in the kitchen.",
   MAIN_SITE_URL: "https://zahrabaxi.com",
-  APP_VERSION: "v1.1.0",
+  APP_VERSION: "v1.8.5",
 
   // Plants — used to fetch recent weather (Open-Meteo, free, no API key)
   // to nudge outdoor plants' watering schedule. Change to your own
@@ -40,8 +40,6 @@ const CONFIG = {
   // credential itself, but it is still scoped to the browser session.
   ADMIN_TOKEN_KEY: "kitchen_admin_token",
   ADMIN_USER_KEY: "kitchen_admin_user",
-  GROCERY_TOKEN_KEY: "kitchen_grocery_token",
-  INVENTORY_TOKEN_KEY: "kitchen_inventory_token",
 
   // Controlled vocabulary. Recipes can still use free-form categories/tags —
   // this list only drives the Inventory admin dropdowns and filter chips.
@@ -56,6 +54,10 @@ const CONFIG = {
   // e.g. "On top of fridge" — appliances don't live in the Fridge/Freezer/
   // Pantry grid system at all).
   ITEM_TYPES: ["Food", "Appliance"],
+
+  // Starting set of wishlist "type" bubbles — more can be added on the fly
+  // from the wishlist item form, and any type already in use shows up too.
+  WISHLIST_TAGS: ["Appliance", "Furniture", "Clothing", "Food", "Coffee", "Decor", "Other"],
 
   // Visual layout ("doll house") defaults. Each location gets a grid of
   // cells that admin can carve into named zones (shelves, drawers, bins)

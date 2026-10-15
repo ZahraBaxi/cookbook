@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Admin — THE KITCHEN</title>
+<title>Admin — Common Place</title>
 <meta name="robots" content="noindex" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,13 +15,28 @@
 
 <header class="site-header">
   <nav class="nav shell" aria-label="Primary">
-    <a class="nav-brand" href="index.html" data-site-title>THE KITCHEN</a>
+    <a class="nav-brand" href="index.html" data-site-title>Common Place</a>
     <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false"><span></span></button>
     <ul class="nav-links">
-      <li><a href="cookbook.html">COOKBOOK</a></li>
-      <li><a href="inventory.html">INVENTORY</a></li>
-      <li><a href="groceries.html">GROCERIES</a></li>
+      <li class="nav-group">
+        <button type="button" class="nav-group__btn" aria-expanded="false">KITCHEN</button>
+        <ul class="nav-sub">
+          <li><a href="cookbook.html">COOKBOOK</a></li>
+          <li><a href="inventory.html">INVENTORY</a></li>
+          <li><a href="groceries.html">GROCERIES</a></li>
+          <li><a href="mealprep.html">MEAL PREP</a></li>
+        </ul>
+      </li>
       <li><a href="plants.html">PLANTS</a></li>
+      <li><a href="wishlist.html">WISHLIST</a></li>
+      <li class="nav-group">
+        <button type="button" class="nav-group__btn" aria-expanded="false">LIFE</button>
+        <ul class="nav-sub">
+          <li><a href="today.html">TODAY</a></li>
+          <li><a href="practice.html">PRACTICE</a></li>
+          <li><a href="growth.html">GROWTH</a></li>
+        </ul>
+      </li>
       <li><a href="admin.html" aria-current="page">ADMIN</a></li>
     </ul>
   </nav>
@@ -55,6 +70,7 @@
       </div>
       <button class="btn btn--ghost" id="admin-logout-btn">LOG OUT</button>
     </div>
+    <p class="admin-missing-empty" id="cloud-version-note" hidden></p>
 
     <div class="security-note">
       This session token authenticates you as an admin. If this site updates, please log out and
@@ -67,6 +83,7 @@
       <button class="admin-tab" role="tab" id="tab-layout" aria-selected="false" aria-controls="panel-layout">LAYOUT</button>
       <button class="admin-tab" role="tab" id="tab-groceries" aria-selected="false" aria-controls="panel-groceries">GROCERIES</button>
       <button class="admin-tab" role="tab" id="tab-plants" aria-selected="false" aria-controls="panel-plants">PLANTS</button>
+      <button class="admin-tab" role="tab" id="tab-wishlist" aria-selected="false" aria-controls="panel-wishlist">WISHLIST</button>
     </div>
 
     <!-- Inventory panel -->
@@ -157,7 +174,7 @@
       <div id="layout-all"></div>
     </div>
 
-    <!-- Groceries panel (shopping locations only — the actual list lives on groceries.html, PIN-gated) -->
+    <!-- Groceries panel (shopping locations only — the actual list lives on groceries.html) -->
     <div id="panel-groceries" role="tabpanel" aria-labelledby="tab-groceries" hidden>
       <p class="admin-missing-empty" style="padding:1rem 0;">
         Set up the places you shop, each with an emoji so they're easy to spot at a glance. These
@@ -184,6 +201,20 @@
       </div>
       <div id="weather-summary" class="admin-missing-empty" style="padding:0.5rem 0 1rem;"></div>
       <div id="plants-list">
+        <div class="loading-row">Loading…</div>
+      </div>
+    </div>
+
+    <!-- Wishlist panel -->
+    <div id="panel-wishlist" role="tabpanel" aria-labelledby="tab-wishlist" hidden>
+      <p class="admin-missing-empty" style="padding:1rem 0;">
+        Things you want for your space. Track the price, where to buy it, a link, and how much you've
+        set aside toward it. Everyone can see the result on <a href="wishlist.html" target="_blank" rel="noopener">wishlist.html</a>.
+      </p>
+      <div class="admin-table-toolbar">
+        <button type="button" class="btn btn--primary" id="add-wishlist-btn">+ ADD ITEM</button>
+      </div>
+      <div id="wishlist-list">
         <div class="loading-row">Loading…</div>
       </div>
     </div>
@@ -246,6 +277,16 @@
             <label>Level</label>
             <div class="level-selector" id="item-level-selector"></div>
             <input type="hidden" id="item-level" name="level" value="Full" />
+          </div>
+          <div class="field field--full">
+            <label class="checkbox-field">
+              <input type="checkbox" id="item-touse" />
+              <span><i class="fa-solid fa-recycle"></i> Flag as "To Use" — boosts recipes that use it toward the top of Cookbook</span>
+            </label>
+          </div>
+          <div class="field field--full" id="item-touse-reason-field" hidden>
+            <label for="item-touse-reason">Why?</label>
+            <input type="text" id="item-touse-reason" placeholder="Going bad, sitting too long, etc." />
           </div>
         </div>
 
@@ -450,6 +491,55 @@
         <button type="submit" class="btn btn--primary">SAVE</button>
         <button type="button" class="btn btn--ghost" id="plant-cancel-btn">CANCEL</button>
         <button type="button" class="btn btn--danger" id="plant-delete-btn" hidden style="margin-left:auto;">DELETE</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Wishlist item modal (Admin → Wishlist) -->
+<div class="modal-overlay" id="wishlist-modal-overlay" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="wishlist-modal-title">
+    <button class="modal__close" id="wishlist-modal-close" aria-label="Close">&times;</button>
+    <h2 id="wishlist-modal-title">New wishlist item</h2>
+    <form id="wishlist-form" novalidate>
+      <div class="form-grid">
+        <div class="field field--full">
+          <label for="wishlist-name">Name</label>
+          <input type="text" id="wishlist-name" data-autofocus required placeholder="Stand mixer" />
+        </div>
+        <div class="field">
+          <label for="wishlist-price">Price ($)</label>
+          <input type="number" id="wishlist-price" min="0" step="0.01" />
+        </div>
+        <div class="field">
+          <label for="wishlist-saved">Saved so far ($)</label>
+          <input type="number" id="wishlist-saved" min="0" step="0.01" />
+        </div>
+        <div class="field">
+          <label for="wishlist-store">Store</label>
+          <input type="text" id="wishlist-store" placeholder="Williams Sonoma" />
+        </div>
+        <div class="field">
+          <label for="wishlist-url">Link (optional)</label>
+          <input type="url" id="wishlist-url" placeholder="https://…" />
+        </div>
+        <div class="field field--full">
+          <label>Type</label>
+          <div class="level-selector" id="wishlist-tag-selector"></div>
+          <div style="display:flex; gap:0.5rem; margin-top:0.5rem; flex-wrap:wrap;">
+            <input type="text" id="wishlist-new-tag" placeholder="Add a new type…" style="flex:1 1 160px; border:1px solid var(--color-border); padding:0.65rem 0.75rem; font-size:1rem; background:var(--color-bg);" />
+            <button type="button" class="btn btn--ghost btn--small" id="wishlist-add-tag-btn">ADD TYPE</button>
+          </div>
+        </div>
+        <div class="field field--full">
+          <label for="wishlist-notes">Notes</label>
+          <textarea id="wishlist-notes" rows="2"></textarea>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn--primary">SAVE</button>
+        <button type="button" class="btn btn--ghost" id="wishlist-cancel-btn">CANCEL</button>
+        <button type="button" class="btn btn--danger" id="wishlist-delete-btn" hidden style="margin-left:auto;">DELETE</button>
       </div>
     </form>
   </div>

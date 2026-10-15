@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Practice — Common Place</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+<link rel="stylesheet" href="css/styles.css" />
+<link rel="stylesheet" href="css/monk.css" />
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="nav shell" aria-label="Primary">
+    <a class="nav-brand" href="index.html" data-site-title>Common Place</a>
+    <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false"><span></span></button>
+    <ul class="nav-links">
+      <li class="nav-group">
+        <button type="button" class="nav-group__btn" aria-expanded="false">KITCHEN</button>
+        <ul class="nav-sub">
+          <li><a href="cookbook.html">COOKBOOK</a></li>
+          <li><a href="inventory.html">INVENTORY</a></li>
+          <li><a href="groceries.html">GROCERIES</a></li>
+          <li><a href="mealprep.html">MEAL PREP</a></li>
+        </ul>
+      </li>
+      <li><a href="plants.html">PLANTS</a></li>
+      <li><a href="wishlist.html">WISHLIST</a></li>
+      <li class="nav-group">
+        <button type="button" class="nav-group__btn" aria-expanded="false" data-current="true">LIFE</button>
+        <ul class="nav-sub">
+          <li><a href="today.html">TODAY</a></li>
+          <li><a href="practice.html" aria-current="page">PRACTICE</a></li>
+          <li><a href="growth.html">GROWTH</a></li>
+        </ul>
+      </li>
+      <li><a href="admin.html">ADMIN</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main>
+  <div class="shell">
+    <div class="page-header page-header--compact">
+      <div class="page-header__eyebrow">Common Place</div>
+      <h1>PRACTICE</h1>
+      <p class="page-header__subtitle">Dharma, movement, place, presence, and care.</p>
+    </div>
+
+    <div class="monk-gate" id="monk-gate" hidden>
+      <p><strong>Viewing only.</strong> <a href="#" id="monk-signin-link">Sign in</a> to edit.</p>
+    </div>
+
+    <div class="monk-wrap">
+      <div class="monk-shell" id="monk-shell" style="display:none">
+        <nav class="monk-tabs" id="monk-tabs" aria-label="Sections"></nav>
+        <div class="monk-main">
+          <div class="monk-content">
+      <!-- DHARMA -->
+      <section class="monk-section" id="sec-dharma" data-title="Dharma">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Dharma</h1>
+        <p class="monk-lede">This is a space for practice, not performance. It doesn't need to be perfect or daily.</p>
+
+        <h2 class="monk-h2">Refuge</h2>
+        <div class="monk-card">
+          <p class="monk-prompt">Buddha, Dharma, Sangha. The teacher, the teaching, and the community around it. Taking refuge just means remembering you're not doing this alone.</p>
+          <button class="monk-btn primary" id="dharma-refuge-btn">I Take Refuge Today</button>
+        </div>
+
+        <h2 class="monk-h2">Sit</h2>
+        <div class="monk-card">
+          <div id="dharma-sit-setup">
+            <p class="monk-home-label" style="margin-bottom:10px">Practice</p>
+            <div class="monk-tag-row" id="dharma-practice-row"></div>
+            <p class="monk-home-label" style="margin:20px 0 10px">Length</p>
+            <div class="monk-tag-row" id="dharma-duration-row"></div>
+            <label class="monk-toggle-row">
+              <input type="checkbox" id="dharma-visual-toggle" checked>
+              <span>Show the breathing circle</span>
+            </label>
+            <button class="monk-btn primary" id="dharma-sit-start" style="margin-top:18px">Begin Sitting</button>
+          </div>
+          <div id="dharma-sit-active" style="display:none">
+            <div class="monk-breath-wrap">
+              <div class="monk-breath-circle" id="dharma-breath-circle"></div>
+            </div>
+            <p class="monk-sit-instruction">This won't control your breathing. It's just something soft to look at, if that helps.</p>
+            <p class="monk-sit-timer" id="dharma-sit-timer">10:00</p>
+            <button class="monk-btn" id="dharma-sit-end">End Sitting</button>
+          </div>
+          <p class="monk-note" id="dharma-sit-stats"></p>
+        </div>
+
+        <h2 class="monk-h2">Loving-Kindness</h2>
+        <div class="monk-card">
+          <p class="monk-home-label" id="dharma-metta-stage" style="margin-bottom:10px"></p>
+          <p class="monk-quote" id="dharma-metta-phrase"></p>
+          <button class="monk-quiet-link" id="dharma-metta-next">Next Phrase</button>
+        </div>
+
+        <h2 class="monk-h2">Mala</h2>
+        <div class="monk-card monk-mala-card">
+          <button class="monk-mala-counter" id="dharma-mala-btn" type="button">
+            <span class="monk-mala-n" id="dharma-mala-n">0</span>
+            <span class="monk-mala-label">of 108</span>
+          </button>
+          <p class="monk-note" id="dharma-mala-stats"></p>
+          <button class="monk-quiet-link" id="dharma-mala-reset">Reset Count</button>
+        </div>
+
+        <h2 class="monk-h2">A Verse for the Moment</h2>
+        <div class="monk-card">
+          <p class="monk-quote" id="dharma-gatha"></p>
+          <button class="monk-quiet-link" id="dharma-gatha-new">Another Verse</button>
+        </div>
+
+        <h2 class="monk-h2">Today's Precepts</h2>
+        <p class="monk-lede">Not a scorecard. Just five things to keep in mind today.</p>
+        <ul class="monk-checklist" id="dharma-precepts"></ul>
+
+        <h2 class="monk-h2">Contemplation</h2>
+        <div class="monk-card">
+          <p class="monk-prompt" id="dharma-prompt"></p>
+          <textarea class="monk-textarea" id="dharma-note" placeholder="Sit with it a moment, then write..."></textarea>
+          <button class="monk-btn primary" id="dharma-save">Save Reflection</button>
+          <button class="monk-btn" id="dharma-new">New Prompt</button>
+        </div>
+        <h2 class="monk-h2">Past Reflections</h2>
+        <div id="dharma-entries"></div>
+      </section>
+      <!-- MOVEMENT -->
+      <section class="monk-section" id="sec-movement" data-title="Movement">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Movement</h1>
+        <p class="monk-lede">Fixed routines, done the same way every time. Nothing shuffled or random. Click one to walk through it.</p>
+        <div class="monk-tag-row" id="movement-tags"></div>
+      </section>
+      <!-- PLACE -->
+      <section class="monk-section" id="sec-place" data-title="Place">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Place</h1>
+        <div class="monk-card">
+          <p class="monk-prompt" id="place-prompt"></p>
+          <textarea class="monk-textarea" id="place-note" placeholder="Write what you noticed..."></textarea>
+          <button class="monk-btn primary" id="place-save">Save Observation</button>
+          <button class="monk-btn" id="place-new">New Prompt</button>
+        </div>
+        <h2 class="monk-h2">Past Observations</h2>
+        <div id="place-entries"></div>
+      </section>
+      <!-- PRESENCE -->
+      <section class="monk-section" id="sec-presence" data-title="Presence, Solitude & Humility">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Presence, Solitude &amp; Humility</h1>
+
+        <h2 class="monk-h2">Presence</h2>
+        <div class="monk-card">
+          <p class="monk-prompt" id="presence-prompt"></p>
+          <button class="monk-btn primary" id="presence-done">I Did This</button>
+          <button class="monk-btn" id="presence-new">New Practice</button>
+        </div>
+
+        <h2 class="monk-h2">Solitude</h2>
+        <div class="monk-card">
+          <p class="monk-prompt" id="solitude-prompt"></p>
+          <button class="monk-btn primary" id="solitude-done">Mark Complete</button>
+          <button class="monk-btn" id="solitude-new">Randomize</button>
+        </div>
+
+        <h2 class="monk-h2">Humility</h2>
+        <div class="monk-card">
+          <p class="monk-prompt" id="humility-prompt"></p>
+          <button class="monk-btn" id="humility-new">New Reminder</button>
+        </div>
+      </section>
+      <!-- ATTENTION -->
+      <section class="monk-section" id="sec-attention" data-title="Attention">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Attention</h1>
+        <div class="monk-counter-row">
+          <button class="monk-counter-btn" data-attn="reached">
+            <span class="n" id="attn-n-reached">0</span>
+            <span class="label">I reached for my phone unnecessarily</span>
+          </button>
+          <button class="monk-counter-btn" data-attn="noticed">
+            <span class="n" id="attn-n-noticed">0</span>
+            <span class="label">I noticed and stopped</span>
+          </button>
+          <button class="monk-counter-btn" data-attn="focused">
+            <span class="n" id="attn-n-focused">0</span>
+            <span class="label">I completed focused work</span>
+          </button>
+        </div>
+        <p class="monk-note">Totals shown are for the last 7 days.</p>
+        <p class="monk-note" id="attn-redirect" style="display:none"></p>
+
+        <h2 class="monk-h2">Instead of This</h2>
+        <p class="monk-lede">A few places worth reaching for instead.</p>
+        <ul class="monk-bookmark-list" id="attn-bookmarks"></ul>
+        <div class="monk-bookmark-add">
+          <input class="monk-input" id="attn-bookmark-label" placeholder="Label">
+          <input class="monk-input" id="attn-bookmark-url" placeholder="https://...">
+          <button class="monk-btn primary" id="attn-bookmark-add">Add</button>
+        </div>
+      </section>
+      <!-- JOY -->
+      <section class="monk-section" id="sec-joy" data-title="Joy">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Joy</h1>
+        <div class="monk-card">
+          <p class="monk-prompt" id="joy-prompt"></p>
+          <button class="monk-btn primary" id="joy-done">I Did This</button>
+          <button class="monk-btn" id="joy-new">Random Joy</button>
+        </div>
+      </section>
+      <!-- STEWARDSHIP -->
+      <section class="monk-section" id="sec-stewardship" data-title="Stewardship">
+        <p class="monk-eyebrow"><span class="chapter-eyebrow-num"></span></p>
+        <h1 class="monk-h1">Stewardship</h1>
+        <div class="monk-card">
+          <p class="monk-prompt" id="stewardship-prompt"></p>
+          <button class="monk-btn primary" id="stewardship-done">Mark Complete</button>
+          <button class="monk-btn" id="stewardship-new">Randomize</button>
+        </div>
+
+        <h2 class="monk-h2">Stitches &amp; Repairs</h2>
+        <p class="monk-lede">A running reference of mending techniques, so you reach for the right one instead of replacing.</p>
+        <ul class="monk-bookmark-list" id="stitch-list"></ul>
+        <div class="monk-inline-add">
+          <input class="monk-input" id="stitch-input" placeholder="Add a stitch or repair type">
+          <button class="monk-btn primary" id="stitch-add">Add</button>
+        </div>
+
+        <h2 class="monk-h2">To Give Away</h2>
+        <p class="monk-lede" id="giveaway-stats"></p>
+        <ul class="monk-checklist" id="giveaway-list"></ul>
+        <div class="monk-inline-add">
+          <input class="monk-input" id="giveaway-input" placeholder="Something to let go of">
+          <button class="monk-btn primary" id="giveaway-add">Add</button>
+        </div>
+      </section>
+          </div>
+        </div>
+      </div>
+
+<input type="file" id="kb-photo-input" accept="image/*" style="display:none">
+
+<div class="monk-modal-overlay" id="monk-modal-overlay" style="display:none">
+  <div class="monk-modal">
+    <button class="monk-modal-close" id="monk-modal-close" aria-label="Close">&times;</button>
+    <div id="monk-modal-body"></div>
+  </div>
+</div>
+
+<div class="monk-sketch-overlay" id="kb-sketch-overlay" style="display:none">
+  <div class="monk-sketch-card">
+    <input class="monk-input monk-sketch-title" id="kb-sketch-title" placeholder="Sketch title">
+    <div class="monk-sketch-toolbar">
+      <button class="monk-sketch-tool active" id="kb-tool-pen" type="button">Pen</button>
+      <button class="monk-sketch-tool" id="kb-tool-eraser" type="button">Eraser</button>
+      <label class="monk-sketch-thickness">
+        Thickness
+        <input type="range" id="kb-thickness" min="1" max="20" value="3">
+      </label>
+      <button class="monk-quiet-link" id="kb-undo" type="button">Undo</button>
+      <button class="monk-btn primary" id="kb-sketch-done" type="button">Done</button>
+    </div>
+    <canvas class="monk-sketch-canvas tool-pen" id="kb-canvas" width="600" height="400"></canvas>
+  </div>
+</div>
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="shell" data-site-footer>Common Place.</div>
+</footer>
+
+<script src="https://unpkg.com/parse/dist/parse.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/parse.js"></script>
+<script src="js/utils.js"></script>
+<script>document.addEventListener("DOMContentLoaded",function(){var l=document.getElementById("monk-signin-link");if(l)l.addEventListener("click",function(e){e.preventDefault();goToAdminSignIn();});});</script>
+<script>window.MONK_PAGE = { label: "Practice" };</script>
+<script src="js/monk/back4app-client.js"></script>
+<script src="js/monk/monk-data.js"></script>
+<script src="js/monk/monk-app.js"></script>
+</body>
+</html>

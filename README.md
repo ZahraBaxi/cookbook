@@ -1,4 +1,4 @@
-# THE KITCHEN — Cookbook + Kitchen Inventory
+# Common Place — home hub (cookbook, inventory, groceries, plants, wishlist)
 
 A personal, black-and-white, single-user cookbook and kitchen inventory site.
 Static HTML/CSS/vanilla JS, backed by Back4App (Parse).
@@ -7,7 +7,8 @@ Static HTML/CSS/vanilla JS, backed by Back4App (Parse).
 
 ```
 /
-├── index.html              Landing page → links to Cookbook / Inventory
+├── index.html              Home hub → cards linking to every section
+├── today.html, practice.html, growth.html   notebook pages (js/monk/, css/monk.css)
 ├── cookbook.html            Recipe browsing, search, filters, detail modal
 ├── inventory.html           Inventory catalog, summary strip, shelf views
 ├── admin.html                Login + dashboard (inventory, recipe, layout,

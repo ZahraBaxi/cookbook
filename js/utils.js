@@ -255,6 +255,24 @@ function matchIngredientAgainstInventory(ingredientName, inventoryItems) {
 }
 
 /**
+ * Which of a recipe's ingredients match something flagged "To Use" in
+ * Inventory (going bad, sitting too long, etc.) — used to boost that
+ * recipe toward the top of Cookbook so it's more likely to get made
+ * before the ingredient goes to waste. Returns [{ item, ingredientName }].
+ */
+function computeToUseMatches(recipe, inventoryItems) {
+  const toUseItems = (inventoryItems || []).filter((i) => i.get("toUse") && (i.get("itemType") || "Food") !== "Appliance");
+  if (!toUseItems.length) return [];
+  const matches = [];
+  (recipe.get("ingredients") || []).forEach((ing) => {
+    if (!ing.name) return;
+    const { have, matchedItem } = matchIngredientAgainstInventory(ing.name, toUseItems);
+    if (have && matchedItem) matches.push({ item: matchedItem, ingredientName: ing.name });
+  });
+  return matches;
+}
+
+/**
  * Given a recipe's ingredients array and the full inventory list,
  * returns a status per ingredient: { ingredient, have, matchedItem, matchedAlternative }
  */
@@ -407,6 +425,35 @@ function titleCase(str) {
   return (str || "").replace(/\w\S*/g, (t) => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase());
 }
 
+/* ---------------------------------------------------------------------
+ * Mobile nav toggle (shared across pages)
+ * ------------------------------------------------------------------- */
+
+function initNavToggle() {
+  const toggle = document.querySelector(".nav-toggle");
+  const menu = document.querySelector(".nav-links");
+  if (!toggle || !menu) return;
+  toggle.addEventListener("click", () => {
+    const isOpen = menu.classList.toggle("nav-links--open");
+    toggle.setAttribute("aria-expanded", String(isOpen));
+  });
+
+  // Dropdown groups: tap to open (touch screens), and tap elsewhere to close.
+  menu.querySelectorAll(".nav-group__btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const group = btn.closest(".nav-group");
+      const open = !group.classList.contains("nav-group--open");
+      menu.querySelectorAll(".nav-group").forEach((g) => g.classList.remove("nav-group--open"));
+      group.classList.toggle("nav-group--open", open);
+      btn.setAttribute("aria-expanded", String(open));
+    });
+  });
+  document.addEventListener("click", () => {
+    menu.querySelectorAll(".nav-group--open").forEach((g) => g.classList.remove("nav-group--open"));
+  });
+}
+
 /**
  * Renders a 1–5 difficulty rating as filled/empty stars, e.g. starRating(3) -> "★★★☆☆".
  * Returns "" for an unset/invalid rating so callers can just check truthiness.
@@ -420,7 +467,6 @@ function starRating(n, max = 5) {
 /* ---------------------------------------------------------------------
  * Toast notifications (replaces ugly browser alerts)
  * ------------------------------------------------------------------- */
-
 function showToast(message, type = "info") {
   let container = document.getElementById("toast-container");
   if (!container) {
@@ -448,7 +494,6 @@ function showToast(message, type = "info") {
  * ------------------------------------------------------------------- */
 
 let lastFocusedBeforeModal = null;
-
 function openModal(modalEl) {
   lastFocusedBeforeModal = document.activeElement;
   modalEl.classList.add("modal--open");
@@ -478,7 +523,6 @@ function openModal(modalEl) {
   modalEl._trapFocus = trapFocus;
   modalEl.addEventListener("keydown", trapFocus);
 }
-
 function closeModal(modalEl) {
   modalEl.classList.remove("modal--open");
   modalEl.setAttribute("aria-hidden", "true");
@@ -491,22 +535,29 @@ function closeModal(modalEl) {
 }
 
 /* ---------------------------------------------------------------------
- * Mobile nav toggle (shared across pages)
+ * Segmented PIN input — 4 individual digit boxes instead of one masked
+ * field. Shared by every PIN-gated page (groceries, inventory).
  * ------------------------------------------------------------------- */
 
-function initNavToggle() {
-  const toggle = document.querySelector(".nav-toggle");
-  const menu = document.querySelector(".nav-links");
-  if (!toggle || !menu) return;
-  toggle.addEventListener("click", () => {
-    const isOpen = menu.classList.toggle("nav-links--open");
-    toggle.setAttribute("aria-expanded", String(isOpen));
+/**
+ * Orders GroceryLocation records by the admin-chosen sortOrder, with any
+ * record that has no sortOrder yet falling to the end, alphabetically.
+ */
+function sortGroceryLocations(list) {
+  return [...list].sort((a, b) => {
+    const ao = a.get("sortOrder");
+    const bo = b.get("sortOrder");
+    const aHas = typeof ao === "number";
+    const bHas = typeof bo === "number";
+    if (aHas && bHas && ao !== bo) return ao - bo;
+    if (aHas !== bHas) return aHas ? -1 : 1;
+    return (a.get("name") || "").localeCompare(b.get("name") || "");
   });
 }
 
 function applySiteCopy() {
   document.querySelectorAll("[data-site-title]").forEach((el) => (el.textContent = CONFIG.SITE_TITLE));
-  document.title = document.title.replace("THE KITCHEN", CONFIG.SITE_TITLE);
+  document.title = document.title.replace(/THE KITCHEN|Common Place/, CONFIG.SITE_TITLE);
 
   document.querySelectorAll("[data-home-subtitle]").forEach((el) => (el.textContent = CONFIG.HOME_SUBTITLE));
 
