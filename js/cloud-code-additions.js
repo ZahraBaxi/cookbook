@@ -52,7 +52,7 @@ const MealPrepEntry = Parse.Object.extend("MealPrepEntry");
 
 // Bump this with every release. The Admin page compares it with the site's
 // version so you can tell at a glance whether the latest Cloud Code is live.
-const CLOUD_CODE_VERSION = "v1.8.5";
+const CLOUD_CODE_VERSION = "v1.8.6";
 
 Parse.Cloud.define("commonPlaceVersion", async () => ({ version: CLOUD_CODE_VERSION }));
 

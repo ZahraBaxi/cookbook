@@ -453,6 +453,10 @@ function handleInventoryLockClick() {
 
 function handleInventoryAuthError(err) {
   if (err && err.code === Parse.Error.INVALID_SESSION_TOKEN) {
+    if (/inventory (access|session)/i.test(err.message || "")) {
+      showToast("The site is newer than the Cloud Code running on Back4App, so this edit was refused. Deploy the newest main.js there, then try again. You are still signed in.", "error");
+      return true;
+    }
     clearAdminSession();
     updateInventoryLockUI();
     showToast("Session expired. Sign in again to edit.", "error");

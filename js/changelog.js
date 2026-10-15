@@ -9,6 +9,13 @@
 
 const CHANGELOG = [
   {
+    version: "v1.8.6",
+    date: "2026-10-15",
+    changes: [
+      "Fixed: when the old Cloud Code is still live, adding to the grocery list or quick-editing inventory no longer signs you out and says the session expired. You stay signed in and the message says the newest Cloud Code needs to be deployed.",
+    ],
+  },
+  {
     version: "v1.8.5",
     date: "2026-10-15",
     changes: [

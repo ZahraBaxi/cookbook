@@ -68,6 +68,12 @@ function handleLockClick() {
  */
 function handleGroceryAuthError(err) {
   if (err && err.code === Parse.Error.INVALID_SESSION_TOKEN) {
+    // The old Cloud Code asks for the retired grocery PIN token. That is not
+    // a real sign-out, so keep the sign-in and say what is actually wrong.
+    if (/grocery (access|session)/i.test(err.message || "")) {
+      showToast("The site is newer than the Cloud Code running on Back4App, so this edit was refused. Deploy the newest main.js there, then try again. You are still signed in.", "error");
+      return true;
+    }
     clearAdminSession();
     showLockedView();
     showToast("Session expired. Sign in again to edit.", "error");
